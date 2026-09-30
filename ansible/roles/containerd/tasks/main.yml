@@ -1,0 +1,14 @@
+---
+- name: Установить containerd
+  ansible.builtin.apt: { name: containerd, state: present, update_cache: true, cache_valid_time: 3600 }
+- name: Зафиксировать версию containerd
+  ansible.builtin.dpkg_selections: { name: containerd, selection: hold }
+- name: Каталог конфигурации
+  ansible.builtin.file: { path: /etc/containerd, state: directory, mode: "0755" }
+- name: config.toml
+  ansible.builtin.template: { src: config.toml.j2, dest: /etc/containerd/config.toml, mode: "0644" }
+  notify: restart containerd
+- name: Запустить containerd
+  ansible.builtin.systemd: { name: containerd, state: started, enabled: true }
+- name: Применить handlers
+  ansible.builtin.meta: flush_handlers

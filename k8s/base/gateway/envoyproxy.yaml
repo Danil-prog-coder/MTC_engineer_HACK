@@ -1,0 +1,43 @@
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: EnvoyProxy
+metadata: { name: public-proxy, namespace: gateway-system }
+spec:
+  provider:
+    type: Kubernetes
+    kubernetes:
+      envoyDeployment:
+        replicas: 2
+        container:
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+      envoyService:
+        type: NodePort
+        externalTrafficPolicy: Local
+        patch:
+          type: StrategicMerge
+          value:
+            spec:
+              ports:
+                # имя порта формируется Envoy Gateway как <protocol>-<port>
+                - { name: http-80, port: 80, nodePort: 30080, protocol: TCP }
+  telemetry:
+    metrics:
+      prometheus: {}
+    accessLog:
+      settings:
+        - format:
+            type: JSON
+            json:
+              ts: "%START_TIME%"
+              log_type: "gateway_access"
+              request_id: "%REQ(X-REQUEST-ID)%"
+              method: "%REQ(:METHOD)%"
+              path: "%REQ(X-ENVOY-ORIGINAL-PATH?:PATH)%"
+              status: "%RESPONSE_CODE%"
+              duration_ms: "%DURATION%"
+              upstream: "%UPSTREAM_HOST%"
+              route: "%ROUTE_NAME%"
+              host: "%REQ(:AUTHORITY)%"
+          sinks:
+            - type: File
+              file: { path: /dev/stdout }

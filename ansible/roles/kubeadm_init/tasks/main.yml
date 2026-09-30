@@ -1,0 +1,45 @@
+---
+- name: Конфигурация kubeadm
+  ansible.builtin.template: { src: kubeadm-config.yaml.j2, dest: /etc/kubernetes/kubeadm-config.yaml, mode: "0600" }
+  vars: { advertise_ip: "{{ node_ip }}" }
+- name: kubeadm init
+  ansible.builtin.command: kubeadm init --config /etc/kubernetes/kubeadm-config.yaml
+  args: { creates: /etc/kubernetes/admin.conf }
+- name: Определить пользователей для kubeconfig
+  ansible.builtin.set_fact:
+    kube_users:
+      - { user: root, home: /root }
+      - { user: "{{ lookup('env', 'SUDO_USER') | default('root', true) }}", home: "{{ '/home/' + lookup('env', 'SUDO_USER') if lookup('env', 'SUDO_USER') else '/root' }}" }
+- name: Каталог .kube
+  ansible.builtin.file: { path: "{{ item.home }}/.kube", state: directory, owner: "{{ item.user }}", mode: "0700" }
+  loop: "{{ kube_users | unique }}"
+- name: Копия admin.conf
+  ansible.builtin.copy:
+    src: /etc/kubernetes/admin.conf
+    dest: "{{ item.home }}/.kube/config"
+    remote_src: true
+    owner: "{{ item.user }}"
+    mode: "0600"
+  loop: "{{ kube_users | unique }}"
+- name: Ждать API
+  ansible.builtin.command: kubectl --kubeconfig {{ kubeconfig }} get --raw /readyz
+  register: readyz
+  until: readyz.rc == 0
+  retries: 30
+  delay: 5
+  changed_when: false
+- name: Taints узла
+  ansible.builtin.command: kubectl --kubeconfig {{ kubeconfig }} get nodes -o jsonpath={.items[*].spec.taints[*].key}
+  register: taints
+  changed_when: false
+- name: Снять taint control-plane (single-node)
+  ansible.builtin.command: kubectl --kubeconfig {{ kubeconfig }} taint nodes --all node-role.kubernetes.io/control-plane-
+  when: "'node-role.kubernetes.io/control-plane' in taints.stdout"
+- name: Одобрить kubelet-serving CSR (serverTLSBootstrap)
+  ansible.builtin.shell: |
+    pending=$(kubectl --kubeconfig {{ kubeconfig }} get csr -o json | jq -r '.items[] | select(.spec.signerName=="kubernetes.io/kubelet-serving") | select((.status.conditions // []) | length == 0) | .metadata.name')
+    [ -z "$pending" ] && exit 0
+    for c in $pending; do kubectl --kubeconfig {{ kubeconfig }} certificate approve "$c"; done
+    echo APPROVED
+  register: csr
+  changed_when: "'APPROVED' in csr.stdout"

@@ -1,0 +1,6 @@
+# Envoy Gateway controller. Gateway/EnvoyProxy — в k8s/base/gateway.
+deployment:
+  envoyGateway:
+    resources:
+      requests: { cpu: 50m, memory: 128Mi }
+      limits: { cpu: 500m, memory: 256Mi }

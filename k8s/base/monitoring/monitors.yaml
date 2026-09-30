@@ -1,0 +1,43 @@
+# Angie: /metrics на порту 9113 (встроенный шаблон prometheus all)
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata: { name: hello, namespace: monitoring, labels: { app: hello } }
+spec:
+  namespaceSelector: { matchNames: [hello] }
+  selector: { matchLabels: { app: hello } }
+  endpoints:
+    - { port: metrics, path: /metrics, interval: 15s }
+---
+# Envoy Proxy: 19001 /stats/prometheus
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata: { name: envoy-proxy, namespace: monitoring }
+spec:
+  namespaceSelector: { matchNames: [gateway-system] }
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: envoy
+  podMetricsEndpoints:
+    - { port: metrics, path: /stats/prometheus, interval: 15s }
+---
+# Envoy Gateway controller
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata: { name: envoy-gateway, namespace: monitoring }
+spec:
+  namespaceSelector: { matchNames: [gateway-system] }
+  selector:
+    matchLabels:
+      control-plane: envoy-gateway
+  endpoints:
+    - { port: metrics, interval: 30s }
+---
+# Fluentd: 24231
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata: { name: fluentd, namespace: monitoring }
+spec:
+  namespaceSelector: { matchNames: [logging] }
+  selector: { matchLabels: { app: fluentd } }
+  podMetricsEndpoints:
+    - { port: metrics, path: /metrics, interval: 15s }

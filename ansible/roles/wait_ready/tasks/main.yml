@@ -1,0 +1,25 @@
+---
+- name: Ресурсы готовы
+  ansible.builtin.command: kubectl --kubeconfig {{ kubeconfig }} -n {{ item.ns }} rollout status {{ item.res }} --timeout=600s
+  loop:
+    - { ns: hello, res: deploy/hello-v1 }
+    - { ns: hello, res: deploy/hello-v2 }
+    - { ns: logging, res: ds/fluentd }
+  changed_when: false
+- name: Gateway Programmed
+  ansible.builtin.command: kubectl --kubeconfig {{ kubeconfig }} -n gateway-system wait --for=condition=Programmed gateway/public-gw --timeout=300s
+  changed_when: false
+- name: HTTP 200 через Gateway
+  ansible.builtin.uri:
+    url: "http://{{ node_ip }}:30080/"
+    return_content: true
+  register: hello_resp
+  until: hello_resp.status is defined and hello_resp.status == 200 and 'Hello World!' in hello_resp.content
+  retries: 40
+  delay: 5
+- name: Сводка
+  ansible.builtin.debug:
+    msg:
+      - "Приложение: curl http://{{ node_ip }}:30080/  -> Hello World!"
+      - "Проверка:   make verify"
+      - "Пароли:     make creds"

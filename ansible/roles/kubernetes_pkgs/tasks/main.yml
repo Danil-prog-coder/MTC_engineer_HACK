@@ -1,0 +1,24 @@
+---
+- name: Ключ репозитория Kubernetes
+  ansible.builtin.shell: |
+    curl -fsSL https://pkgs.k8s.io/core:/stable:/v{{ versions.kubernetes.minor }}/deb/Release.key | gpg --dearmor -o /etc/apt/keyrings/kubernetes-{{ versions.kubernetes.minor }}.gpg
+  args: { creates: "/etc/apt/keyrings/kubernetes-{{ versions.kubernetes.minor }}.gpg" }
+- name: Репозиторий Kubernetes
+  ansible.builtin.apt_repository:
+    repo: "deb [signed-by=/etc/apt/keyrings/kubernetes-{{ versions.kubernetes.minor }}.gpg] https://pkgs.k8s.io/core:/stable:/v{{ versions.kubernetes.minor }}/deb/ /"
+    filename: kubernetes
+    state: present
+- name: kubeadm/kubelet/kubectl точной версии
+  ansible.builtin.apt:
+    name:
+      - "kubelet={{ versions.kubernetes.patch }}{{ versions.kubernetes.apt_suffix }}"
+      - "kubeadm={{ versions.kubernetes.patch }}{{ versions.kubernetes.apt_suffix }}"
+      - "kubectl={{ versions.kubernetes.patch }}{{ versions.kubernetes.apt_suffix }}"
+    state: present
+    update_cache: true
+    allow_downgrade: true
+- name: apt-mark hold
+  ansible.builtin.dpkg_selections: { name: "{{ item }}", selection: hold }
+  loop: [kubelet, kubeadm, kubectl]
+- name: kubelet включён
+  ansible.builtin.systemd: { name: kubelet, enabled: true }

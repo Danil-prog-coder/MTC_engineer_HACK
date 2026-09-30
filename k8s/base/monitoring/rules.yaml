@@ -1,0 +1,24 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata: { name: hello-basic, namespace: monitoring }
+spec:
+  groups:
+    - name: hello.rules
+      rules:
+        - alert: HelloDown
+          expr: sum(up{job="hello"}) < 1
+          for: 2m
+          labels: { severity: critical }
+          annotations: { summary: "Нет доступных экземпляров hello" }
+        - alert: GatewayHighErrorRate
+          expr: |
+            sum(rate(envoy_cluster_upstream_rq_xx{envoy_response_code_class="5"}[5m]))
+              / clamp_min(sum(rate(envoy_cluster_upstream_rq_total[5m])), 1) > 0.05
+          for: 5m
+          labels: { severity: warning }
+          annotations: { summary: "Доля 5xx на Gateway > 5%" }
+        - alert: LogPipelineBacklog
+          expr: max(fluentd_output_status_buffer_queue_length) > 100
+          for: 10m
+          labels: { severity: warning }
+          annotations: { summary: "Очередь буфера Fluentd растёт" }

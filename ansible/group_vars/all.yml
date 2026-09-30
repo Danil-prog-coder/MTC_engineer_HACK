@@ -1,0 +1,8 @@
+versions: "{{ lookup('file', playbook_dir + '/../versions.yaml') | from_yaml }}"
+repo_dir: "{{ playbook_dir }}/.."
+domain: "{{ lookup('env', 'DOMAIN') | default('hack.local', true) }}"
+expose: "{{ lookup('env', 'EXPOSE') | default('nodeport', true) }}"
+node_ip: "{{ lookup('env', 'NODE_IP') | default(ansible_default_ipv4.address, true) }}"
+secrets_dir: /etc/hackops/secrets
+kubeconfig: /etc/kubernetes/admin.conf
+k8s_kubeconfig: "{{ kubeconfig }}"

@@ -1,0 +1,13 @@
+# VictoriaLogs single. Имя сервиса фиксируем: victoria-logs.logging.svc:9428
+fullnameOverride: victoria-logs
+server:
+  fullnameOverride: victoria-logs
+  retentionPeriod: 7d
+  persistentVolume:
+    enabled: true
+    storageClassName: local-path
+    size: 10Gi
+  resources:
+    requests: { cpu: 50m, memory: 128Mi }
+    limits: { memory: 512Mi }
+  serviceMonitor: { enabled: true }

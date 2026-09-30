@@ -1,0 +1,19 @@
+---
+- name: Hello Platform — полный деплой
+  hosts: all
+  gather_facts: true
+  roles:
+    - { role: preflight, tags: [preflight] }
+    - { role: os_prep, tags: [host] }
+    - { role: containerd, tags: [host] }
+    - { role: kubernetes_pkgs, tags: [host] }
+    - { role: kubeadm_init, tags: [cluster] }
+    - { role: cni_calico, tags: [cluster] }
+    - { role: storage_local_path, tags: [platform] }
+    - { role: secrets, tags: [platform] }
+    - { role: cert_manager, tags: [platform] }
+    - { role: envoy_gateway, tags: [platform] }
+    - { role: monitoring, tags: [platform] }
+    - { role: logging, tags: [platform] }
+    - { role: app_hello, tags: [app] }
+    - { role: wait_ready, tags: [wait] }

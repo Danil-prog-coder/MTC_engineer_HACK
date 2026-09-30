@@ -1,0 +1,13 @@
+---
+- name: cert-manager
+  kubernetes.core.helm:
+    kubeconfig: "{{ kubeconfig }}"
+    name: cert-manager
+    chart_ref: cert-manager
+    chart_repo_url: "{{ versions.cert_manager.chart_repo }}"
+    chart_version: "{{ versions.cert_manager.version }}"
+    release_namespace: cert-manager
+    wait: true
+    timeout: 10m
+    values:
+      crds: { enabled: true }

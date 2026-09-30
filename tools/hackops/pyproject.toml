@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hackops"
+version = "1.0.0"
+description = "Операционный тулинг Hello Platform: verify, отчёты (не приложение)"
+requires-python = ">=3.12"
+dependencies = [
+  "typer==0.15.1",
+  "click<8.2",
+  "pyyaml==6.0.2",
+]
+
+[project.optional-dependencies]
+dev = ["pytest==8.3.4", "ruff==0.8.6", "mypy==1.14.1", "types-PyYAML==6.0.12.20241230"]
+
+[project.scripts]
+hackops = "hackops.cli:app"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.mypy]
+strict = true
+files = ["src/hackops/core"]

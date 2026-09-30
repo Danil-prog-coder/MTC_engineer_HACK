@@ -1,0 +1,26 @@
+---
+- name: Tigera operator
+  kubernetes.core.k8s:
+    kubeconfig: "{{ kubeconfig }}"
+    definition: "{{ lookup('url', 'https://raw.githubusercontent.com/projectcalico/calico/' + versions.calico.version + '/manifests/tigera-operator.yaml', split_lines=False) | from_yaml_all | list }}"
+    apply: true
+    server_side_apply: { field_manager: hackops, force_conflicts: true }
+- name: Calico Installation
+  kubernetes.core.k8s:
+    kubeconfig: "{{ kubeconfig }}"
+    apply: true
+    definition:
+      apiVersion: operator.tigera.io/v1
+      kind: Installation
+      metadata: { name: default }
+      spec:
+        calicoNetwork:
+          ipPools:
+            - { cidr: "{{ versions.kubernetes.pod_cidr }}", encapsulation: VXLAN, natOutgoing: Enabled, nodeSelector: all() }
+  register: calico_inst
+  retries: 12
+  delay: 10
+  until: calico_inst is succeeded
+- name: Ждать узел Ready
+  ansible.builtin.command: kubectl --kubeconfig {{ kubeconfig }} wait --for=condition=Ready node --all --timeout=600s
+  changed_when: false

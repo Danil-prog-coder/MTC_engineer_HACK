@@ -1,0 +1,13 @@
+artifacts/
+!artifacts/.gitkeep
+.env
+*.pyc
+__pycache__/
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+secrets/
+*.key
+*.pem
+.venv-test/

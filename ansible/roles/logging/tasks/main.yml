@@ -1,0 +1,18 @@
+---
+- name: VictoriaLogs
+  kubernetes.core.helm:
+    kubeconfig: "{{ kubeconfig }}"
+    name: victoria-logs
+    chart_ref: victoria-logs-single
+    chart_repo_url: "{{ versions.victoria_logs.chart_repo }}"
+    chart_version: "{{ versions.victoria_logs.version }}"
+    release_namespace: logging
+    wait: true
+    timeout: 10m
+    values: "{{ lookup('file', repo_dir + '/helm-values/victoria-logs.yaml') | from_yaml }}"
+- name: Fluentd
+  kubernetes.core.k8s:
+    kubeconfig: "{{ kubeconfig }}"
+    apply: true
+    server_side_apply: { field_manager: hackops, force_conflicts: true }
+    definition: "{{ lookup('kubernetes.core.kustomize', dir=repo_dir + '/k8s/base/logging') | from_yaml_all | list }}"

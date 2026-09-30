@@ -1,0 +1,33 @@
+---
+- name: Проверка ОС (Ubuntu 24.04)
+  ansible.builtin.assert:
+    that:
+      - ansible_distribution == "Ubuntu"
+      - ansible_distribution_version == "24.04"
+    fail_msg: "Поддерживается только Ubuntu 24.04 (найдено {{ ansible_distribution }} {{ ansible_distribution_version }})"
+- name: Проверка ресурсов
+  ansible.builtin.assert:
+    that:
+      - ansible_processor_vcpus | int >= 2
+      - ansible_memtotal_mb | int >= 3500
+    fail_msg: "Минимум: 2 vCPU и 4 ГБ RAM (рекомендовано 4 vCPU / 8 ГБ / 40 ГБ диска)"
+- name: Проверка интернета (pkgs.k8s.io)
+  ansible.builtin.uri:
+    url: https://pkgs.k8s.io/core:/stable:/v{{ versions.kubernetes.minor }}/deb/Release
+    method: HEAD
+    timeout: 20
+  retries: 3
+  delay: 5
+  register: net_check
+  until: net_check is succeeded
+- name: Наличие кластера
+  ansible.builtin.stat: { path: /etc/kubernetes/admin.conf }
+  register: admin_conf
+- name: Порты свободны (только если кластера ещё нет)
+  ansible.builtin.wait_for:
+    port: "{{ item }}"
+    state: stopped
+    timeout: 1
+    msg: "Порт {{ item }} занят"
+  loop: [6443, 30080, 30443]
+  when: not admin_conf.stat.exists

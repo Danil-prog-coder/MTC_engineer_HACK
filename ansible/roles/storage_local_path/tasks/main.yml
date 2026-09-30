@@ -1,0 +1,20 @@
+---
+- name: local-path-provisioner
+  kubernetes.core.k8s:
+    kubeconfig: "{{ kubeconfig }}"
+    definition: "{{ lookup('url', 'https://raw.githubusercontent.com/rancher/local-path-provisioner/' + versions.local_path_provisioner.version + '/deploy/local-path-storage.yaml', split_lines=False) | from_yaml_all | list }}"
+    apply: true
+    server_side_apply: { field_manager: hackops, force_conflicts: true }
+- name: StorageClass по умолчанию
+  kubernetes.core.k8s:
+    kubeconfig: "{{ kubeconfig }}"
+    apply: true
+    definition:
+      apiVersion: storage.k8s.io/v1
+      kind: StorageClass
+      metadata:
+        name: local-path
+        annotations: { storageclass.kubernetes.io/is-default-class: "true" }
+      provisioner: rancher.io/local-path
+      volumeBindingMode: WaitForFirstConsumer
+      reclaimPolicy: Delete

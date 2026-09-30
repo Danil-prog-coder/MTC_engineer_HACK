@@ -1,0 +1,31 @@
+# hello-default: без hostname — простейшая проверка `curl http://<IP>:30080/` (R-11)
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata: { name: hello-default, namespace: hello }
+spec:
+  parentRefs:
+    - { name: public-gw, namespace: gateway-system, sectionName: http }
+  rules:
+    - matches: [{ path: { type: PathPrefix, value: / } }]
+      backendRefs: [{ name: hello, port: 8080 }]
+      timeouts: { request: 10s }
+---
+# hello: по hostname; заголовок x-variant: v2 закрепляет вариант; остальное — веса 90/10
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata: { name: hello, namespace: hello }
+spec:
+  parentRefs:
+    - { name: public-gw, namespace: gateway-system }
+  hostnames: ["hello.hack.local"]
+  rules:
+    - matches:
+        - path: { type: PathPrefix, value: / }
+          headers: [{ name: x-variant, value: v2 }]
+      backendRefs: [{ name: hello-v2, port: 8080 }]
+    - matches:
+        - path: { type: PathPrefix, value: / }
+      backendRefs:
+        - { name: hello-v1, port: 8080, weight: 90 }
+        - { name: hello-v2, port: 8080, weight: 10 }
+      timeouts: { request: 5s }

@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hello-v2
+  namespace: hello
+  labels: { app: hello, variant: "v2" }
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: hello, variant: "v2" }
+  template:
+    metadata:
+      labels: { app: hello, variant: "v2" }
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101
+        runAsGroup: 101
+        seccompProfile: { type: RuntimeDefault }
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels: { app: hello, variant: "v2" }
+      containers:
+        - name: angie
+          image: docker.angie.software/angie:1.12.1-minimal
+          command: ["angie", "-c", "/etc/angie/angie.conf", "-g", "daemon off;"]
+          ports:
+            - { name: http, containerPort: 8080 }
+            - { name: metrics, containerPort: 9113 }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits: { cpu: 200m, memory: 128Mi }
+          readinessProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          volumeMounts:
+            - { name: conf, mountPath: /etc/angie/angie.conf, subPath: angie.conf, readOnly: true }
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: conf
+          configMap: { name: angie-v2 }
+        - name: tmp
+          emptyDir: {}

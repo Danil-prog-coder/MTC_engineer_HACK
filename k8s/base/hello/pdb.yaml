@@ -1,0 +1,13 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: { name: hello-v1, namespace: hello }
+spec:
+  minAvailable: 1
+  selector: { matchLabels: { app: hello, variant: v1 } }
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: { name: hello-v2, namespace: hello }
+spec:
+  minAvailable: 1
+  selector: { matchLabels: { app: hello, variant: v2 } }

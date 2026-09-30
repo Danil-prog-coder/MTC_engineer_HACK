@@ -1,0 +1,38 @@
+---
+- name: Отключить swap
+  ansible.builtin.command: swapoff -a
+  when: ansible_swaptotal_mb | int > 0
+- name: Убрать swap из fstab
+  ansible.builtin.replace:
+    path: /etc/fstab
+    regexp: '^([^#].*\sswap\s.*)$'
+    replace: '# \1'
+- name: Модули ядра
+  community.general.modprobe: { name: "{{ item }}", state: present, persistent: present }
+  loop: [overlay, br_netfilter]
+- name: sysctl
+  ansible.posix.sysctl:
+    name: "{{ item.k }}"
+    value: "{{ item.v }}"
+    sysctl_file: /etc/sysctl.d/99-k8s.conf
+    reload: true
+  loop:
+    - { k: net.bridge.bridge-nf-call-iptables, v: "1" }
+    - { k: net.bridge.bridge-nf-call-ip6tables, v: "1" }
+    - { k: net.ipv4.ip_forward, v: "1" }
+    - { k: fs.inotify.max_user_instances, v: "1024" }
+    - { k: fs.inotify.max_user_watches, v: "524288" }
+- name: Базовые пакеты
+  ansible.builtin.apt:
+    name: [apt-transport-https, ca-certificates, curl, gpg, conntrack, socat, ipset, jq, python3-kubernetes, python3-yaml, uuid-runtime, git, make]
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+- name: Helm (официальный apt-репозиторий)
+  ansible.builtin.shell: |
+    set -e
+    curl -fsSL https://baltocdn.com/helm/signing.asc | gpg --dearmor -o /usr/share/keyrings/helm.gpg
+    echo "deb [signed-by=/usr/share/keyrings/helm.gpg] https://baltocdn.com/helm/stable/debian/ all main" > /etc/apt/sources.list.d/helm.list
+    apt-get update -qq && apt-get install -y helm
+  args:
+    creates: /usr/bin/helm

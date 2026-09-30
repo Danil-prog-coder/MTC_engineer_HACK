@@ -1,0 +1,33 @@
+# Роли Gateway API по namespace (ТЗ 4.2). PSA: hello=restricted; остальные baseline,
+# кроме monitoring (node-exporter: hostPath/hostNetwork) и logging (Fluentd читает /var/log узла) — privileged.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: gateway-system
+  labels: { pod-security.kubernetes.io/enforce: baseline }
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: hello
+  labels:
+    gateway-access: "true"
+    pod-security.kubernetes.io/enforce: restricted
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+  labels: { pod-security.kubernetes.io/enforce: privileged }
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: logging
+  labels: { pod-security.kubernetes.io/enforce: privileged }
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cert-manager
+  labels: { pod-security.kubernetes.io/enforce: baseline }

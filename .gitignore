@@ -11,3 +11,4 @@ secrets/
 *.key
 *.pem
 .venv-test/
+*.egg-info/

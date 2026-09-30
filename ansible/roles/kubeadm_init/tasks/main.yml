@@ -5,11 +5,12 @@
 - name: kubeadm init
   ansible.builtin.command: kubeadm init --config /etc/kubernetes/kubeadm-config.yaml
   args: { creates: /etc/kubernetes/admin.conf }
-- name: Определить пользователей для kubeconfig
+- name: Определить пользователей для kubeconfig (root + пользователь, запустивший make; см. Makefile)
   ansible.builtin.set_fact:
     kube_users:
       - { user: root, home: /root }
-      - { user: "{{ lookup('env', 'SUDO_USER') | default('root', true) }}", home: "{{ '/home/' + lookup('env', 'SUDO_USER') if lookup('env', 'SUDO_USER') else '/root' }}" }
+      - user: "{{ lookup('env', 'HACK_USER') | default('root', true) }}"
+        home: "{{ lookup('env', 'HACK_HOME') | default('/root', true) }}"
 - name: Каталог .kube
   ansible.builtin.file: { path: "{{ item.home }}/.kube", state: directory, owner: "{{ item.user }}", mode: "0700" }
   loop: "{{ kube_users | unique }}"

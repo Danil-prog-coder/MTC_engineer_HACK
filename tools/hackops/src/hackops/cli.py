@@ -12,7 +12,7 @@ import uuid
 import typer
 
 from hackops.adapters import kube
-from hackops.core import checks
+from hackops.core import checks, recap
 from hackops.core.checks import CheckResult, Report, Status, check
 
 app = typer.Typer(add_completion=False, help="Hello Platform: проверки и отчёты")
@@ -219,6 +219,19 @@ def logs_query(q: str = typer.Argument(..., help="запрос LogsQL")) -> None
     for r in rows:
         typer.echo(json.dumps(r, ensure_ascii=False))
     raise typer.Exit(0)
+
+
+@app.command("idempotency")
+def idempotency(
+    log: pathlib.Path = typer.Argument(..., help="Лог второго прогона ansible-playbook"),
+    out: pathlib.Path = typer.Option(pathlib.Path("artifacts/idempotency.json"), help="Куда писать результат"),
+) -> None:
+    """Разобрать PLAY RECAP повторного прогона: changed должно быть 0."""
+    r = recap.parse_recap(log.read_text(encoding="utf-8", errors="replace"))
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps({**r, "time": dt.datetime.now(dt.UTC).strftime("%Y-%m-%d %H:%M:%SZ")}), encoding="utf-8")
+    typer.echo(f"повторный прогон: {r}")
+    raise typer.Exit(0 if recap.is_idempotent(r) else 1)
 
 
 def main() -> None:

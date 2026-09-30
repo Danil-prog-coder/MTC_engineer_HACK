@@ -24,7 +24,7 @@
     - { k: fs.inotify.max_user_watches, v: "524288" }
 - name: Базовые пакеты
   ansible.builtin.apt:
-    name: [apt-transport-https, ca-certificates, curl, gpg, conntrack, socat, ipset, jq, python3-kubernetes, python3-yaml, uuid-runtime, git, make]
+    name: [apt-transport-https, ca-certificates, curl, gpg, conntrack, socat, ipset, jq, python3-kubernetes, python3-yaml, python3-venv, python3-pip, uuid-runtime, git, make]
     state: present
     update_cache: true
     cache_valid_time: 3600

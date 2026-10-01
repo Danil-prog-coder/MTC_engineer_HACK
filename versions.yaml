@@ -8,6 +8,8 @@ kubernetes:
   service_cidr: "10.96.0.0/12"
 containerd:
   apt_version: ""          # пусто = версия из репозитория Ubuntu, фиксируется apt-mark hold
+helm:
+  version: "v3.17.3"
 calico:
   version: "v3.31.0"       # (verify)
 local_path_provisioner:

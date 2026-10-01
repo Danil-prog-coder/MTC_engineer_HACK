@@ -77,6 +77,7 @@ flowchart LR
 | Ubuntu | 24.04 LTS | — |
 | containerd | из репозитория Ubuntu, `apt-mark hold` | Ansible |
 | kubeadm / kubelet / kubectl | 1.36.4 | Ansible, `pkgs.k8s.io`, `apt-mark hold` |
+| Helm | v3.17.3 | Ansible, бинарник с get.helm.sh (проверка sha256) |
 | Calico (Tigera operator) | v3.31.0 | Ansible, манифест |
 | local-path-provisioner | v0.0.32 | Ansible, манифест (StorageClass по умолчанию) |
 | Gateway API CRD (Standard) | v1.6.1 | Helm `gateway-crds-helm` |

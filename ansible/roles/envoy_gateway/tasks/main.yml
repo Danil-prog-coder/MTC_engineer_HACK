@@ -1,17 +1,28 @@
 ---
-- name: Gateway API CRD (Standard) и CRD Envoy Gateway
-  kubernetes.core.helm:
-    kubeconfig: "{{ kubeconfig }}"
-    name: eg-crds
+# CRD (Gateway API + Envoy Gateway) весят > 1 МиБ — Helm не сможет сохранить релиз в Secret.
+# Рендерим чарт и применяем server-side: changed корректен, релиза Helm нет.
+- name: Рендер CRD Gateway API (Standard) и Envoy Gateway
+  kubernetes.core.helm_template:
     chart_ref: "{{ versions.envoy_gateway.crds_chart }}"
     chart_version: "{{ versions.envoy_gateway.version }}"
+    release_name: eg-crds
     release_namespace: gateway-system
-    wait: true
-    timeout: 10m
-    values:
+    include_crds: true
+    release_values:
       crds:
         gatewayAPI: { enabled: true, channel: standard }
         envoyGateway: { enabled: true }
+  register: eg_crds
+- name: Применить CRD (server-side apply)
+  kubernetes.core.k8s:
+    kubeconfig: "{{ kubeconfig }}"
+    apply: true
+    server_side_apply: { field_manager: hackops, force_conflicts: true }
+    definition: "{{ eg_crds.stdout | from_yaml_all | select | list }}"
+  retries: 3
+  delay: 10
+  register: eg_crds_apply
+  until: eg_crds_apply is succeeded
 - name: Envoy Gateway
   kubernetes.core.helm:
     kubeconfig: "{{ kubeconfig }}"

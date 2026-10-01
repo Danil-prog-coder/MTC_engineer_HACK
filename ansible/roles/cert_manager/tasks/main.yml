@@ -11,3 +11,7 @@
     timeout: 10m
     values:
       crds: { enabled: true }
+  register: helm_result
+  until: helm_result is succeeded
+  retries: 3
+  delay: 15

@@ -10,6 +10,10 @@
     wait: true
     timeout: 15m
     values: "{{ lookup('file', repo_dir + '/helm-values/kube-prometheus-stack.yaml') | from_yaml }}"
+  register: helm_result
+  until: helm_result is succeeded
+  retries: 3
+  delay: 15
 - name: Мониторинг (ServiceMonitor, PodMonitor, PrometheusRule)
   kubernetes.core.k8s:
     kubeconfig: "{{ kubeconfig }}"

@@ -5,6 +5,10 @@
     definition: "{{ lookup('url', 'https://raw.githubusercontent.com/rancher/local-path-provisioner/' + versions.local_path_provisioner.version + '/deploy/local-path-storage.yaml', split_lines=False) | from_yaml_all | list }}"
     apply: true
     server_side_apply: { field_manager: hackops, force_conflicts: true }
+  register: lpp_apply
+  retries: 5
+  delay: 15
+  until: lpp_apply is succeeded
 - name: StorageClass по умолчанию
   kubernetes.core.k8s:
     kubeconfig: "{{ kubeconfig }}"

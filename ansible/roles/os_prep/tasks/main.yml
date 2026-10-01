@@ -28,6 +28,10 @@
     state: present
     update_cache: true
     cache_valid_time: 3600
+  register: base_pkgs
+  retries: 5
+  delay: 15
+  until: base_pkgs is succeeded
 - name: Версия установленного Helm
   ansible.builtin.command: /usr/local/bin/helm version --short
   register: helm_installed
@@ -43,6 +47,10 @@
         dest: "/tmp/helm-{{ versions.helm.version }}.tar.gz"
         mode: "0644"
         timeout: 60
+      register: helm_download
+      retries: 5
+      delay: 15
+      until: helm_download is succeeded
     - name: Установить helm в /usr/local/bin
       ansible.builtin.unarchive:
         src: "/tmp/helm-{{ versions.helm.version }}.tar.gz"

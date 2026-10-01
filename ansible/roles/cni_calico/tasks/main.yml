@@ -5,6 +5,10 @@
     definition: "{{ lookup('url', 'https://raw.githubusercontent.com/projectcalico/calico/' + versions.calico.version + '/manifests/tigera-operator.yaml', split_lines=False) | from_yaml_all | list }}"
     apply: true
     server_side_apply: { field_manager: hackops, force_conflicts: true }
+  register: tigera_apply
+  retries: 5
+  delay: 15
+  until: tigera_apply is succeeded
 - name: Calico Installation
   kubernetes.core.k8s:
     kubeconfig: "{{ kubeconfig }}"

@@ -72,6 +72,7 @@ error_log stderr warn;
 events { worker_connections 1024; }
 
 http {
+    include prometheus_all.conf;   # встроенный шаблон метрик "all" (файл из пакета Angie)
     default_type text/plain;
     client_body_temp_path /tmp/client_body;
     proxy_temp_path       /tmp/proxy;

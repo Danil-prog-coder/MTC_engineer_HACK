@@ -11,3 +11,7 @@
     timeout: 10m
     values:
       crds: { enabled: true }
+  register: helm_cert_manager_cert_manager
+  retries: 5
+  delay: 20
+  until: helm_cert_manager_cert_manager is succeeded

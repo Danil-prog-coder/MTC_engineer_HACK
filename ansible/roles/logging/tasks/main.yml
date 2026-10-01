@@ -10,6 +10,10 @@
     wait: true
     timeout: 10m
     values: "{{ lookup('file', repo_dir + '/helm-values/victoria-logs.yaml') | from_yaml }}"
+  register: helm_logging_victorialogs
+  retries: 5
+  delay: 20
+  until: helm_logging_victorialogs is succeeded
 - name: Fluentd
   kubernetes.core.k8s:
     kubeconfig: "{{ kubeconfig }}"

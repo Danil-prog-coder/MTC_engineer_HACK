@@ -34,6 +34,10 @@
     timeout: 10m
     skip_crds: true
     values: "{{ lookup('file', repo_dir + '/helm-values/envoy-gateway.yaml') | from_yaml }}"
+  register: helm_envoy_gateway_envoy
+  retries: 5
+  delay: 20
+  until: helm_envoy_gateway_envoy is succeeded
 - name: Gateway (EnvoyProxy, GatewayClass, Gateway, Certificate)
   kubernetes.core.k8s:
     kubeconfig: "{{ kubeconfig }}"

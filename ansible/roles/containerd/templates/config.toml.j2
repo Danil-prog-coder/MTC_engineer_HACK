@@ -1,7 +1,7 @@
 # Управляется Ansible. Ubuntu 24.04 -> containerd 1.7.x (config version 2).
 version = 2
 [plugins."io.containerd.grpc.v1.cri"]
-  sandbox_image = "registry.k8s.io/pause:3.10"
+  sandbox_image = "registry.k8s.io/pause:3.10.2"
   [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
     runtime_type = "io.containerd.runc.v2"
     [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options]

@@ -13,6 +13,7 @@
         gatewayAPI: { enabled: true, channel: standard }
         envoyGateway: { enabled: true }
   register: eg_crds
+  changed_when: false  # только рендер, изменения вносит следующая задача
 - name: Применить CRD (server-side apply)
   kubernetes.core.k8s:
     kubeconfig: "{{ kubeconfig }}"

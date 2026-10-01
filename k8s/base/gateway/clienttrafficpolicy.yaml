@@ -1,0 +1,13 @@
+# Сохранять X-Request-Id, присланный клиентом (иначе Envoy подменяет его своим UUID) — сквозной id для F2
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: ClientTrafficPolicy
+metadata:
+  name: preserve-request-id
+  namespace: gateway-system
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: public-gw
+  headers:
+    requestID: PreserveOrGenerate

@@ -2,14 +2,31 @@
 - name: Конфигурация kubeadm
   ansible.builtin.template: { src: kubeadm-config.yaml.j2, dest: /etc/kubernetes/kubeadm-config.yaml, mode: "0600" }
   vars: { advertise_ip: "{{ node_ip }}" }
-- name: kubeadm init
-  ansible.builtin.command: kubeadm init --config /etc/kubernetes/kubeadm-config.yaml
+- name: Предзагрузка образов control-plane (с повторами, на случай медленной сети)
+  ansible.builtin.command: kubeadm config images pull --config /etc/kubernetes/kubeadm-config.yaml
   args: { creates: /etc/kubernetes/admin.conf }
-- name: Определить пользователей для kubeconfig
+  register: kubeadm_images
+  retries: 5
+  delay: 20
+  until: kubeadm_images is succeeded
+- name: kubeadm init с откатом при неудаче
+  block:
+    - name: kubeadm init
+      ansible.builtin.command: kubeadm init --config /etc/kubernetes/kubeadm-config.yaml
+      args: { creates: /etc/kubernetes/admin.conf }
+  rescue:
+    # admin.conf появляется до конца init: без отката повторный запуск счёл бы кластер готовым
+    - name: Откатить неудачную инициализацию (kubeadm reset)
+      ansible.builtin.command: kubeadm reset -f
+    - name: Остановить деплой
+      ansible.builtin.fail:
+        msg: kubeadm init не завершился, состояние сброшено. Повторите make deploy
+- name: Определить пользователей для kubeconfig (root + пользователь, запустивший make; см. Makefile)
   ansible.builtin.set_fact:
     kube_users:
       - { user: root, home: /root }
-      - { user: "{{ lookup('env', 'SUDO_USER') | default('root', true) }}", home: "{{ '/home/' + lookup('env', 'SUDO_USER') if lookup('env', 'SUDO_USER') else '/root' }}" }
+      - user: "{{ lookup('env', 'HACK_USER') | default('root', true) }}"
+        home: "{{ lookup('env', 'HACK_HOME') | default('/root', true) }}"
 - name: Каталог .kube
   ansible.builtin.file: { path: "{{ item.home }}/.kube", state: directory, owner: "{{ item.user }}", mode: "0700" }
   loop: "{{ kube_users | unique }}"

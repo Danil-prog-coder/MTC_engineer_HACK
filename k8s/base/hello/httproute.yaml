@@ -29,3 +29,32 @@ spec:
         - { name: hello-v1, port: 8080, weight: 90 }
         - { name: hello-v2, port: 8080, weight: 10 }
       timeouts: { request: 5s }
+---
+# HTTP -> HTTPS: secure.hack.local на порту 80 перенаправляется на https://hello.hack.local:30443 (NodePort)
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata: { name: hello-redirect, namespace: hello }
+spec:
+  parentRefs:
+    - { name: public-gw, namespace: gateway-system, sectionName: http }
+  hostnames: ["secure.hack.local"]
+  rules:
+    - filters:
+        - type: RequestRedirect
+          requestRedirect: { scheme: https, hostname: hello.hack.local, port: 30443, statusCode: 301 }
+---
+# Rate limit (Envoy Gateway BackendTrafficPolicy, local): защита hello от всплесков, ответ 429
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: BackendTrafficPolicy
+metadata: { name: hello-limits, namespace: hello }
+spec:
+  targetRefs:
+    - { group: gateway.networking.k8s.io, kind: HTTPRoute, name: hello }
+  rateLimit:
+    type: Local
+    local:
+      rules:
+        - limit: { requests: 100, unit: Second }
+  retry:
+    numRetries: 2
+    retryOn: { triggers: [connect-failure, reset], httpStatusCodes: [503] }

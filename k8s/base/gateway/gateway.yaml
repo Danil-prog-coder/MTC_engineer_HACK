@@ -12,3 +12,16 @@ spec:
           from: Selector
           selector:
             matchLabels: { gateway-access: "true" }
+    # TLS завершается на Gateway; сертификат выпускает cert-manager (k8s/base/tls)
+    - name: https
+      protocol: HTTPS
+      port: 443
+      hostname: "*.hack.local"
+      tls:
+        mode: Terminate
+        certificateRefs: [{ kind: Secret, name: hello-tls }]
+      allowedRoutes:
+        namespaces:
+          from: Selector
+          selector:
+            matchLabels: { gateway-access: "true" }

@@ -1,0 +1,11 @@
+# Сертификат listener'а https Gateway public-gw
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata: { name: hello-tls, namespace: gateway-system }
+spec:
+  secretName: hello-tls
+  dnsNames: [hello.hack.local, secure.hack.local]
+  duration: 2160h
+  renewBefore: 360h
+  privateKey: { algorithm: ECDSA, size: 256, rotationPolicy: Always }
+  issuerRef: { name: hack-local-ca, kind: ClusterIssuer, group: cert-manager.io }

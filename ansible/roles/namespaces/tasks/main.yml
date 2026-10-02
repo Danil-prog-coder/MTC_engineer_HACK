@@ -1,0 +1,7 @@
+---
+- name: Namespace'ы с метками PSA и gateway-access
+  kubernetes.core.k8s:
+    kubeconfig: "{{ kubeconfig }}"
+    apply: true
+    server_side_apply: { field_manager: hackops, force_conflicts: true }
+    definition: "{{ lookup('kubernetes.core.kustomize', dir=repo_dir + '/k8s/base/namespaces') | from_yaml_all | list }}"

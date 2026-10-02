@@ -1,6 +1,7 @@
 """CLI hackops: verify (F1), logs-find / logs-query. Коды возврата: 0 PASS, 1 FAIL, 2 ошибка окружения."""
 from __future__ import annotations
 
+import base64
 import datetime as dt
 import json
 import pathlib
@@ -12,7 +13,7 @@ import uuid
 import typer
 
 from hackops.adapters import kube
-from hackops.core import checks
+from hackops.core import checks, recap
 from hackops.core.checks import CheckResult, Report, Status, check
 
 app = typer.Typer(add_completion=False, help="Hello Platform: проверки и отчёты")
@@ -145,6 +146,9 @@ def _run_checks(rep: Report, base: str) -> None:
     rep.add(check("R-06/R-11", "GET / через Gateway -> Hello World!", f"curl {base}/",
                   code == 200 and body.strip() == "Hello World!", f"HTTP {code}\n{body}"))
 
+    # F-TLS: HTTPS на Gateway (сертификат cert-manager, проверка по корневому CA) и HTTP->HTTPS redirect
+    _check_tls(rep, base)
+
     # R-16 + F2: сквозной request_id
     marker = f"verify-{uuid.uuid4()}"
     code, hdrs, body = kube.http_get(f"{base}/", {"X-Request-Id": marker})
@@ -194,6 +198,30 @@ def _run_checks(rep: Report, base: str) -> None:
                             "ещё не запускался: выполните make idempotency-check"))
 
 
+def _check_tls(rep: Report, base: str) -> None:
+    host = base.split("//", 1)[1].rsplit(":", 1)[0]
+    try:
+        ca_b64 = kube.kubectl("-n", "cert-manager", "get", "secret", "hack-local-ca",
+                              "-o", "jsonpath={.data.tls\\.crt}")
+    except kube.EnvError as e:
+        rep.add(CheckResult("F-TLS", "HTTPS через Gateway (TLS cert-manager)", "make ca", Status.FAIL, str(e)))
+        return
+    ca_file = pathlib.Path("artifacts/ca.crt")
+    ca_file.parent.mkdir(parents=True, exist_ok=True)
+    ca_file.write_bytes(base64.b64decode(ca_b64))
+    cmd = f"curl --cacert artifacts/ca.crt --resolve hello.hack.local:30443:{host} https://hello.hack.local:30443/"
+    rc, out = kube.curl("--cacert", str(ca_file), "--resolve", f"hello.hack.local:30443:{host}",
+                        "https://hello.hack.local:30443/")
+    rep.add(check("F-TLS", "HTTPS: сертификат проверен корневым CA, ответ Hello World!", cmd,
+                  rc == 0 and out.strip() == "Hello World!", f"rc={rc}\n{out[:300]}"))
+    rc, out = kube.curl("-I", "-H", "Host: secure.hack.local", f"{base}/")
+    first = out.splitlines()[0] if out.strip() else ""
+    rep.add(check("F-TLS", "HTTP -> HTTPS: 301 на https://hello.hack.local:30443",
+                  f"curl -I -H 'Host: secure.hack.local' {base}/",
+                  rc == 0 and " 301" in first and "location: https://hello.hack.local:30443" in out.lower(),
+                  out[:400]))
+
+
 @app.command("logs-find")
 def logs_find(id: str = typer.Argument(..., help="request_id")) -> None:
     """Найти все записи логов по request_id."""
@@ -219,6 +247,19 @@ def logs_query(q: str = typer.Argument(..., help="запрос LogsQL")) -> None
     for r in rows:
         typer.echo(json.dumps(r, ensure_ascii=False))
     raise typer.Exit(0)
+
+
+@app.command("idempotency")
+def idempotency(
+    log: pathlib.Path = typer.Argument(..., help="Лог второго прогона ansible-playbook"),
+    out: pathlib.Path = typer.Option(pathlib.Path("artifacts/idempotency.json"), help="Куда писать результат"),
+) -> None:
+    """Разобрать PLAY RECAP повторного прогона: changed должно быть 0."""
+    r = recap.parse_recap(log.read_text(encoding="utf-8", errors="replace"))
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps({**r, "time": dt.datetime.now(dt.UTC).strftime("%Y-%m-%d %H:%M:%SZ")}), encoding="utf-8")
+    typer.echo(f"повторный прогон: {r}")
+    raise typer.Exit(0 if recap.is_idempotent(r) else 1)
 
 
 def main() -> None:

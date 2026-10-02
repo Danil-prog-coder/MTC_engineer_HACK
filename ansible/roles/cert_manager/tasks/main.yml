@@ -11,7 +11,20 @@
     timeout: 10m
     values:
       crds: { enabled: true }
-  register: helm_result
-  until: helm_result is succeeded
-  retries: 3
-  delay: 15
+  register: helm_cert_manager_cert_manager
+  retries: 5
+  delay: 20
+  until: helm_cert_manager_cert_manager is succeeded
+- name: TLS-цепочка (ClusterIssuer, корневой CA, сертификат Gateway)
+  kubernetes.core.k8s:
+    kubeconfig: "{{ kubeconfig }}"
+    apply: true
+    server_side_apply: { field_manager: hackops, force_conflicts: true }
+    definition: "{{ lookup('kubernetes.core.kustomize', dir=repo_dir + '/k8s/base/tls') | from_yaml_all | list }}"
+  register: tls_apply
+  retries: 6
+  delay: 10
+  until: tls_apply is succeeded   # webhook cert-manager может ответить не сразу
+- name: Сертификат hello-tls выпущен
+  ansible.builtin.command: kubectl --kubeconfig {{ kubeconfig }} -n gateway-system wait --for=condition=Ready certificate/hello-tls --timeout=180s
+  changed_when: false

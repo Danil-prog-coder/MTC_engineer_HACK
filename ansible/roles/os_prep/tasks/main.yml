@@ -24,15 +24,38 @@
     - { k: fs.inotify.max_user_watches, v: "524288" }
 - name: Базовые пакеты
   ansible.builtin.apt:
-    name: [apt-transport-https, ca-certificates, curl, gpg, conntrack, socat, ipset, jq, python3-kubernetes, python3-yaml, uuid-runtime, git, make]
+    name: [apt-transport-https, ca-certificates, curl, gpg, conntrack, socat, ipset, jq, python3-kubernetes, python3-yaml, python3-venv, python3-pip, uuid-runtime, git, make]
     state: present
     update_cache: true
     cache_valid_time: 3600
-- name: Helm (официальный apt-репозиторий)
-  ansible.builtin.shell: |
-    set -e
-    curl -fsSL https://baltocdn.com/helm/signing.asc | gpg --dearmor -o /usr/share/keyrings/helm.gpg
-    echo "deb [signed-by=/usr/share/keyrings/helm.gpg] https://baltocdn.com/helm/stable/debian/ all main" > /etc/apt/sources.list.d/helm.list
-    apt-get update -qq && apt-get install -y helm
-  args:
-    creates: /usr/bin/helm
+  register: base_pkgs
+  retries: 5
+  delay: 15
+  until: base_pkgs is succeeded
+- name: Версия установленного Helm
+  ansible.builtin.command: /usr/local/bin/helm version --short
+  register: helm_installed
+  changed_when: false
+  failed_when: false
+- name: Helm (официальный бинарник get.helm.sh, версия из versions.yaml, проверка sha256)
+  when: helm_installed.rc != 0 or not helm_installed.stdout.startswith(versions.helm.version)
+  block:
+    - name: Скачать архив Helm
+      ansible.builtin.get_url:
+        url: "https://get.helm.sh/helm-{{ versions.helm.version }}-linux-amd64.tar.gz"
+        checksum: "sha256:https://get.helm.sh/helm-{{ versions.helm.version }}-linux-amd64.tar.gz.sha256sum"
+        dest: "/tmp/helm-{{ versions.helm.version }}.tar.gz"
+        mode: "0644"
+        timeout: 60
+      register: helm_download
+      retries: 5
+      delay: 15
+      until: helm_download is succeeded
+    - name: Установить helm в /usr/local/bin
+      ansible.builtin.unarchive:
+        src: "/tmp/helm-{{ versions.helm.version }}.tar.gz"
+        dest: /usr/local/bin
+        remote_src: true
+        include: [linux-amd64/helm]
+        extra_opts: [--strip-components=1]
+        mode: "0755"

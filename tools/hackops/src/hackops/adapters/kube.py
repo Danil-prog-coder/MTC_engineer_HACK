@@ -49,6 +49,20 @@ def http_get(
         return 0, {}, str(e)
 
 
+def curl(*args: str, timeout: int = 15) -> tuple[int, str]:
+    """curl без shell: нужен для SNI/--resolve и ответов-редиректов, которые urllib сам проходит."""
+    try:
+        p = subprocess.run(
+            ["curl", "-sS", "--max-time", str(timeout), *args],
+            capture_output=True, text=True, timeout=timeout + 5, check=False,
+        )
+    except FileNotFoundError as e:
+        raise EnvError("curl не найден") from e
+    except subprocess.TimeoutExpired:
+        return 28, "таймаут"
+    return p.returncode, p.stdout + p.stderr
+
+
 def prom_query(query: str) -> list[dict[str, Any]]:
     path = (
         "/api/v1/namespaces/monitoring/services/kps-prometheus:9090/proxy/api/v1/query?"

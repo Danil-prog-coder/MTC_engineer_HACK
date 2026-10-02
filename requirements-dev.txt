@@ -1,0 +1,2 @@
+# Линтеры (make lint). Тесты и ruff/mypy hackops ставятся через tools/hackops[dev].
+yamllint==1.38.0

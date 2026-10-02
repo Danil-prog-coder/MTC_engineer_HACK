@@ -4,5 +4,7 @@ domain: "{{ lookup('env', 'DOMAIN') | default('hack.local', true) }}"
 expose: "{{ lookup('env', 'EXPOSE') | default('nodeport', true) }}"
 node_ip: "{{ lookup('env', 'NODE_IP') | default(ansible_default_ipv4.address, true) }}"
 secrets_dir: /etc/hackops/secrets
-kubeconfig: /etc/kubernetes/admin.conf
+# kubeconfig пользователя, запустившего make (его копирует роль kubeadm_init): модули k8s читают файл
+# на стороне контроллера без root, поэтому /etc/kubernetes/admin.conf (0600 root) не подходит.
+kubeconfig: "{{ lookup('env', 'HACK_HOME') | default('/root', true) }}/.kube/config"
 k8s_kubeconfig: "{{ kubeconfig }}"

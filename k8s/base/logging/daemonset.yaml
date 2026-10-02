@@ -23,8 +23,8 @@ spec:
           volumeMounts:
             - { name: conf, mountPath: /fluentd/etc/fluent.conf, subPath: fluent.conf, readOnly: true }
             - { name: varlog, mountPath: /var/log, readOnly: true }
-            - { name: state, mountPath: /var/log/fluentd-pos, subPath: pos }
-            - { name: state, mountPath: /var/log/fluentd-buffer, subPath: buffer }
+            - { name: state, mountPath: /fluentd-state/pos, subPath: pos }
+            - { name: state, mountPath: /fluentd-state/buffer, subPath: buffer }
       volumes:
         - name: conf
           configMap: { name: fluentd-conf }

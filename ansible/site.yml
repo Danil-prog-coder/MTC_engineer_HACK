@@ -10,6 +10,7 @@
     - { role: kubeadm_init, tags: [cluster] }
     - { role: cni_calico, tags: [cluster] }
     - { role: storage_local_path, tags: [platform] }
+    - { role: namespaces, tags: [platform] }
     - { role: secrets, tags: [platform] }
     - { role: cert_manager, tags: [platform] }
     - { role: envoy_gateway, tags: [platform] }

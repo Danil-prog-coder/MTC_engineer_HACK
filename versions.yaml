@@ -1,5 +1,5 @@
 # ЕДИНСТВЕННЫЙ источник версий. Ни одного тега latest.
-# Значения, помеченные (verify), сверяются командой `make versions-check` на первой ВМ.
+# Значения, помеченные (verify), сверяются вручную на первой ВМ по чек-листу docs/VERIFY_ON_VM.md.
 kubernetes:
   minor: "1.36"
   patch: "1.36.4"          # (verify) последний патч ветки 1.36
@@ -8,6 +8,8 @@ kubernetes:
   service_cidr: "10.96.0.0/12"
 containerd:
   apt_version: ""          # пусто = версия из репозитория Ubuntu, фиксируется apt-mark hold
+helm:
+  version: "v3.17.3"
 calico:
   version: "v3.31.0"       # (verify)
 local_path_provisioner:

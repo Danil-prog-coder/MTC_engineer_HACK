@@ -22,3 +22,30 @@ spec:
           for: 10m
           labels: { severity: warning }
           annotations: { summary: "Очередь буфера Fluentd растёт" }
+        - alert: HelloHighLatency
+          expr: |
+            histogram_quantile(0.95, sum by (le) (rate(envoy_cluster_upstream_rq_time_bucket[5m]))) > 500
+          for: 10m
+          labels: { severity: warning }
+          annotations: { summary: "p95 задержки через Gateway > 500 мс" }
+        - alert: HelloRateLimited
+          expr: sum(rate(envoy_cluster_upstream_rq_xx{envoy_response_code_class="4"}[5m])) > 50
+          for: 5m
+          labels: { severity: info }
+          annotations: { summary: "Много 4xx (в том числе 429 от rate limit) на Gateway" }
+    - name: platform.rules
+      rules:
+        - alert: PlatformTargetDown
+          expr: up{job=~"hello|kps-prometheus|.*/fluentd|.*/envoy-proxy"} == 0
+          for: 5m
+          labels: { severity: warning }
+          annotations: { summary: "Target {{ $labels.job }}/{{ $labels.instance }} недоступен для Prometheus" }
+        - alert: HelloPodRestarting
+          expr: increase(kube_pod_container_status_restarts_total{namespace=~"hello|logging|gateway-system"}[15m]) > 2
+          labels: { severity: warning }
+          annotations: { summary: "Контейнер {{ $labels.namespace }}/{{ $labels.pod }} перезапускается" }
+        - alert: NodeDiskFillingUp
+          expr: node_filesystem_avail_bytes{mountpoint="/",fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes{mountpoint="/"} < 0.15
+          for: 10m
+          labels: { severity: warning }
+          annotations: { summary: "На узле осталось < 15% диска (хранилища Prometheus/логов — local-path)" }

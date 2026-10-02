@@ -7,6 +7,8 @@ spec:
     metadata: { labels: { app: fluentd } }
     spec:
       serviceAccountName: fluentd
+      priorityClassName: system-node-critical   # логи узла не должны вытесняться рабочей нагрузкой
+      terminationGracePeriodSeconds: 30
       tolerations:
         - { operator: Exists }
       containers:
@@ -15,8 +17,22 @@ spec:
           env:
             - { name: FLUENTD_CONF, value: fluent.conf }
             - { name: FLUENT_UID, value: "0" }
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            # root нужен для чтения /var/log/pods (0640 root); эскалация привилегий отключена
+            allowPrivilegeEscalation: false
+            seccompProfile: { type: RuntimeDefault }
           ports:
             - { name: metrics, containerPort: 24231 }
+          readinessProbe:
+            httpGet: { path: /metrics, port: metrics }
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /metrics, port: metrics }
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            failureThreshold: 5
           resources:
             requests: { cpu: 50m, memory: 128Mi }
             limits: { memory: 384Mi }

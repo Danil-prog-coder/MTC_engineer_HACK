@@ -10,6 +10,8 @@ spec:
         container:
           resources:
             requests: { cpu: 50m, memory: 64Mi }
+      envoyPDB:
+        minAvailable: 1
       envoyService:
         type: NodePort
         externalTrafficPolicy: Local

@@ -5,6 +5,19 @@
 Gateway API (Envoy Gateway), мониторинг (Prometheus) и сбор логов (Fluentd → VictoriaLogs), а `make verify`
 сама доказывает, что всё работает.
 
+## Быстрый старт
+
+```bash
+git clone https://github.com/danil-prog-coder/MTC_engineer_HACK.git && cd MTC_engineer_HACK
+make deploy     # кластер + платформа + приложение (Ubuntu 24.04, sudo без пароля)
+make verify     # отчёт-доказательство: artifacts/verification-report.md
+curl http://$(hostname -I | awk '{print $1}'):30080/     # Hello World!
+```
+
+Где что проверять: приложение и Gateway API — [раздел 9](#9-проверка-доступности-приложения), мониторинг —
+[раздел 10](#10-проверка-мониторинга), логирование — [раздел 11](#11-проверка-логирования),
+дополнительные возможности — [раздел 13](#13-дополнительные-возможности), ограничения — [раздел 15](#15-известные-ограничения).
+
 ## 1. Краткое описание решения
 
 | Что | Как |
@@ -26,11 +39,14 @@ Gateway API (Envoy Gateway), мониторинг (Prometheus) и сбор ло�
 
 ```mermaid
 flowchart LR
-    U[Клиент: curl] -->|HTTP :30080| EP
+    U[Клиент: curl] -->|HTTP :30080 / HTTPS :30443| EP
     subgraph K8s["Kubernetes 1.36 (kubeadm, Ubuntu 24.04, Calico)"]
         subgraph gw["ns: gateway-system"]
             EGC[Envoy Gateway controller] -.xDS.-> EP[Envoy Proxy x2<br/>Service NodePort]
             GWR[(GatewayClass eg / Gateway public-gw)]
+        end
+        subgraph cm["ns: cert-manager"]
+            CM[cert-manager] -.Secret hello-tls.-> GWR
         end
         subgraph app["ns: hello"]
             HR[(HTTPRoute hello-default, hello)]
@@ -63,7 +79,7 @@ flowchart LR
 
 | Поток | Путь | Формат |
 |---|---|---|
-| Пользовательский трафик | Клиент → Envoy (NodePort 30080) → Service `hello` → Angie :8080 | HTTP |
+| Пользовательский трафик | Клиент → Envoy (NodePort 30080 HTTP / 30443 HTTPS, TLS завершается на Envoy) → Service `hello` → Angie :8080 | HTTP / HTTPS |
 | Метрики | Angie :9113, Envoy :19001, Fluentd :24231, kubelet, node-exporter и др. → Prometheus | pull, Prometheus exposition |
 | Логи | stdout контейнеров → `/var/log/containers` → Fluentd (tail) → VictoriaLogs | CRI → JSON → HTTP JSON lines |
 
@@ -85,6 +101,7 @@ flowchart LR
 | cert-manager | v1.19.1 | Helm |
 | kube-prometheus-stack | 77.13.0 | Helm |
 | VictoriaLogs (`victoria-logs-single`) | чарт 0.11.12 | Helm |
+| Grafana, Prometheus, Alertmanager | в составе kube-prometheus-stack 77.13.0 | Helm |
 | Angie | 1.12.1-minimal | Kustomize |
 | Fluentd | v1.19.3 (образ `fluentd-kubernetes-daemonset`) | Kustomize |
 | Ansible (контроллер) | ansible-core 2.18.19 в `.venv` | `make bootstrap` |
@@ -101,7 +118,8 @@ flowchart LR
 - Топология: один узел, taint control-plane снимается. CNI — Calico (VXLAN, pod CIDR 10.244.0.0/16).
 - Метрики control-plane (controller-manager, scheduler, etcd, kube-proxy) слушают на 0.0.0.0 — иначе их
   targets в Prometheus красные; kubelet использует `serverTLSBootstrap`, CSR одобряется автоматически.
-- Почему 1.36, а не 1.37: 1.36 входит в проверенный производителем диапазон Envoy Gateway v1.9.
+- Почему 1.36: версия входит в диапазон Kubernetes, поддерживаемый Envoy Gateway v1.9; патч-версия
+  зафиксирована в `versions.yaml` и пакеты стоят на `apt-mark hold`.
 
 ## 5. Реализация Gateway API
 
@@ -109,11 +127,14 @@ flowchart LR
 
 | Ресурс | Namespace | Назначение |
 |---|---|---|
-| `EnvoyProxy/public-proxy` | gateway-system | 2 реплики Envoy, Service NodePort `30080`, `externalTrafficPolicy: Local`, JSON access-лог, Prometheus-метрики |
+| `EnvoyProxy/public-proxy` | gateway-system | 2 реплики Envoy, Service NodePort `30080` (HTTP) и `30443` (HTTPS), `externalTrafficPolicy: Local`, JSON access-лог, Prometheus-метрики |
 | `GatewayClass/eg` | (cluster) | контроллер `gateway.envoyproxy.io/gatewayclass-controller`, параметры — `public-proxy` |
-| `Gateway/public-gw` | gateway-system | listener `http:80`; маршруты допускаются только из namespace с меткой `gateway-access: "true"` |
+| `Gateway/public-gw` | gateway-system | listener `http:80` и `https:443` (TLS Terminate, Secret `hello-tls`); маршруты допускаются только из namespace с меткой `gateway-access: "true"` |
+| `ClientTrafficPolicy/preserve-request-id` | gateway-system | сохраняет `X-Request-Id` клиента (сквозной id для логов) |
 | `HTTPRoute/hello-default` | hello | без hostname: `/` → Service `hello` (проверка по IP без заголовка Host) |
-| `HTTPRoute/hello` | hello | `hello.hack.local`: заголовок `x-variant: v2` → `hello-v2`; остальное — `hello-v1`/`hello-v2` в пропорции 90/10 |
+| `HTTPRoute/hello` | hello | `hello.hack.local` (HTTP и HTTPS): заголовок `x-variant: v2` → `hello-v2`; остальное — `hello-v1`/`hello-v2` в пропорции 90/10 |
+| `HTTPRoute/hello-redirect` | hello | `secure.hack.local` на :80 → 301 на `https://hello.hack.local:30443` |
+| `BackendTrafficPolicy/hello-limits` | hello | local rate limit 100 rps (429) и ретраи для `HTTPRoute/hello` |
 
 Роли по namespace: инфраструктура (Gateway) — `gateway-system`, приложение (маршруты) — `hello`.
 
@@ -125,7 +146,9 @@ flowchart LR
 - Доступ в интернет: `pkgs.k8s.io`, `github.com`/`raw.githubusercontent.com`, Docker Hub,
   `docker.angie.software`, `charts.jetstack.io`, `prometheus-community.github.io`,
   `victoriametrics.github.io`, PyPI, `galaxy.ansible.com`.
-- Свободные порты: 6443, 30080 (preflight проверяет их до установки кластера).
+- Свободные порты: 6443, 30080, 30443 (preflight проверяет их до установки кластера).
+- Имена `hello.hack.local` и `secure.hack.local` в DNS не нужны: в проверках используется заголовок `Host`
+  или `curl --resolve`; для браузера добавьте их в `/etc/hosts` с IP узла.
 
 ## 7. Развёртывание: пошагово
 
@@ -166,13 +189,18 @@ curl -s  -H 'Host: hello.hack.local' -H 'x-variant: v2' http://$NODE_IP:30080/ap
 kubectl get gatewayclass,gateway,httproute -A        # Accepted / Programmed / ResolvedRefs = True
 ```
 
+HTTPS и редирект (раздел 13): `make ca`, затем
+`curl --cacert artifacts/ca.crt --resolve hello.hack.local:30443:$NODE_IP https://hello.hack.local:30443/` и
+`curl -I -H 'Host: secure.hack.local' http://$NODE_IP:30080/` (301). Все эти проверки выполняет `make verify`.
+
 ## 10. Проверка мониторинга
 
 Собираются метрики: Angie (встроенный шаблон `prometheus all`, порт 9113, `ServiceMonitor/hello`), Envoy Proxy
 (`PodMonitor/envoy-proxy`, `/stats/prometheus`), Envoy Gateway controller, Fluentd (порт 24231), а также
 kube-prometheus-stack: kubelet/cAdvisor, node-exporter, kube-state-metrics, apiserver, etcd, scheduler,
 controller-manager, kube-proxy. Правила: [`k8s/base/monitoring/rules.yaml`](k8s/base/monitoring/rules.yaml)
-(`HelloDown`, `GatewayHighErrorRate`, `LogPipelineBacklog`).
+(`HelloDown`, `GatewayHighErrorRate`, `LogPipelineBacklog`). Дашборды Grafana (Gateway/Envoy: rps, коды ответов,
+latency p50/p95/p99, CPU/RAM; приложение и узел) загружаются из git автоматически.
 
 ```bash
 kubectl -n monitoring port-forward svc/kps-prometheus 9090:9090 &   # затем http://localhost:9090/targets
@@ -210,6 +238,7 @@ make logs-query Q='log_type:error'
 [PASS] R-01  Все поды решения Running/Ready
 [PASS] R-09  GatewayClass Accepted / Gateway Programmed / HTTPRoute Accepted и ResolvedRefs
 [PASS] R-06/R-11 GET / через Gateway -> Hello World!
+[PASS] F-TLS HTTPS проверен корневым CA; HTTP -> HTTPS redirect 301
 [PASS] F2    X-Request-Id возвращается клиентом
 [PASS] R-14/R-15/R-16/F2 Запрос найден в логах: gateway_access + access (один request_id)
 [PASS] R-14  error-лог приложения собран
@@ -242,6 +271,7 @@ make logs-query Q='log_type:error'
 - Секретов в репозитории нет. Пароль Grafana генерируется при деплое (`/etc/hackops/secrets`, права 0700/0600),
   создаётся Kubernetes Secret; показать — `make creds`.
 - Pod Security Admission: `hello` — `restricted` (enforce), `gateway-system` и `cert-manager` — `baseline`.
+- TLS на Gateway (cert-manager, ECDSA P-256, автоматическое продление), rate limit на маршруте `hello`.
 - Приложение: non-root (uid 101), `readOnlyRootFilesystem`, `drop ALL`, seccomp `RuntimeDefault`, лимиты ресурсов.
 - NetworkPolicy в `hello`: default-deny; разрешены Envoy → 8080, Prometheus → 9113 и DNS.
 - Fluentd ≥ 1.19.3, `monitor_agent` не используется.
@@ -250,7 +280,7 @@ make logs-query Q='log_type:error'
 ## 15. Известные ограничения
 
 - Один узел control-plane: нет HA. Worker-узлы добавляются `kubeadm join` вручную, автоматизации нет.
-- Доступ по NodePort 30080 (HTTP), а не 80/443: облачного LoadBalancer нет. `EXPOSE=metallb` зарезервирован в
+- Доступ по NodePort 30080 (HTTP) и 30443 (HTTPS), а не 80/443: облачного LoadBalancer нет. `EXPOSE=metallb` зарезервирован в
   настройках, но **не реализован**.
 - TLS — самоподписанный корневой CA (`make ca` сохраняет его в `artifacts/ca.crt`); публично доверенный
   сертификат (Let's Encrypt) потребует публичный домен. Basic-auth админ-UI не реализован.
@@ -278,9 +308,10 @@ Makefile                 точка входа (make help)
 versions.yaml            единственный источник версий
 ansible/                 site.yml и роли (preflight … wait_ready)
 helm-values/             values Helm-чартов (Envoy Gateway, kube-prometheus-stack, VictoriaLogs)
-k8s/base/                Kustomize: namespaces, gateway, hello, logging, monitoring
+k8s/base/                Kustomize: namespaces, gateway, tls, hello, logging, monitoring (+ дашборды Grafana)
 k8s/overlays/kubeadm/    сборка приложения для стенда
 tools/hackops/           Python-тулинг: verify, logs-find, logs-query, idempotency (+ unit-тесты)
-scripts/                 gen_hello.py (генерация hello-v1/v2 из одного шаблона), destroy.sh
+scripts/                 gen_hello.py (hello-v1/v2 из одного шаблона), gen_dashboards.py, destroy.sh
+.github/workflows/       CI (ci.yml)
 docs/                    architecture.md, VERIFY_ON_VM.md
 ```

@@ -60,6 +60,10 @@ APP = dashboard("hello-app", "Hello Platform / Приложение и узел"
     panel(6, "RAM pod'ов hello",
           [('sum by (pod) (container_memory_working_set_bytes{namespace="hello",container!=""})', "{{pod}}")], 12, 4, "bytes"),
     panel(7, "CPU узла", [('1 - avg(rate(node_cpu_seconds_total{mode="idle"}[5m]))', "cpu")], 0, 12, "percentunit"),
+    panel(9, "Angie: запросы в секунду по pod",
+          [("sum by (pod) (rate(angie_http_server_zones_requests_total{job=\"hello\"}[1m]))", "{{pod}}")], 0, 20, "reqps"),
+    panel(10, "Angie: ответы по HTTP-кодам",
+          [("sum by (code) (rate(angie_http_server_zones_responses{job=\"hello\"}[1m]))", "{{code}}")], 12, 20, "reqps"),
     panel(8, "RAM узла", [("1 - sum(node_memory_MemAvailable_bytes) / sum(node_memory_MemTotal_bytes)", "ram")], 12, 12,
           "percentunit"),
 ])

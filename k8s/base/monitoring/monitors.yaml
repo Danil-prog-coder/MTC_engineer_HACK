@@ -4,7 +4,10 @@ kind: ServiceMonitor
 metadata: { name: hello, namespace: monitoring, labels: { app: hello } }
 spec:
   namespaceSelector: { matchNames: [hello] }
-  selector: { matchLabels: { app: hello } }
+  # только агрегирующий Service hello: у hello-v1/v2 есть метка variant (иначе каждый pod скрейпится трижды)
+  selector:
+    matchLabels: { app: hello }
+    matchExpressions: [{ key: variant, operator: DoesNotExist }]
   endpoints:
     - { port: metrics, path: /metrics, interval: 15s }
 ---
@@ -18,7 +21,8 @@ spec:
     matchLabels:
       app.kubernetes.io/name: envoy
   podMetricsEndpoints:
-    - { port: metrics, path: /stats/prometheus, interval: 15s }
+    # по номеру порта: имя порта у pod'ов Envoy зависит от версии Envoy Gateway
+    - { portNumber: 19001, path: /stats/prometheus, interval: 15s }
 ---
 # Envoy Gateway controller
 apiVersion: monitoring.coreos.com/v1

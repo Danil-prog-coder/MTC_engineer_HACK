@@ -9,8 +9,8 @@ prometheus:
     ruleSelectorNilUsesHelmValues: false
     probeSelectorNilUsesHelmValues: false
     resources:
-      requests: { cpu: 200m, memory: 700Mi }
-      limits: { memory: 1500Mi }
+      requests: { cpu: 100m, memory: 400Mi }
+      limits: { memory: 1200Mi }
     storageSpec:
       volumeClaimTemplate:
         spec:

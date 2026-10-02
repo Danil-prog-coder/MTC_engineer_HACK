@@ -5,10 +5,15 @@
     definition: "{{ lookup('url', 'https://raw.githubusercontent.com/projectcalico/calico/' + versions.calico.version + '/manifests/tigera-operator.yaml', split_lines=False) | from_yaml_all | list }}"
     apply: true
     server_side_apply: { field_manager: hackops, force_conflicts: true }
+  register: tigera_apply
+  retries: 5
+  delay: 15
+  until: tigera_apply is succeeded
 - name: Calico Installation
   kubernetes.core.k8s:
     kubeconfig: "{{ kubeconfig }}"
     apply: true
+    server_side_apply: { field_manager: hackops, force_conflicts: true }
     definition:
       apiVersion: operator.tigera.io/v1
       kind: Installation
@@ -16,7 +21,17 @@
       spec:
         calicoNetwork:
           ipPools:
-            - { cidr: "{{ versions.kubernetes.pod_cidr }}", encapsulation: VXLAN, natOutgoing: Enabled, nodeSelector: all() }
+            # поля по умолчанию заданы явно: ipPools — атомарный список, иначе оператор достраивает их при каждом прогоне
+            - name: default-ipv4-ippool
+              cidr: "{{ versions.kubernetes.pod_cidr }}"
+              encapsulation: VXLAN
+              natOutgoing: Enabled
+              nodeSelector: all()
+              blockSize: 26
+              allowedUses: [Workload, Tunnel]
+              assignmentMode: Automatic
+              disableBGPExport: false
+              disableNewAllocations: false
   register: calico_inst
   retries: 12
   delay: 10

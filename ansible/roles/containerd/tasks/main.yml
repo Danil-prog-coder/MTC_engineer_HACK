@@ -1,6 +1,10 @@
 ---
 - name: Установить containerd
   ansible.builtin.apt: { name: containerd, state: present, update_cache: true, cache_valid_time: 3600 }
+  register: containerd_apt
+  retries: 5
+  delay: 15
+  until: containerd_apt is succeeded
 - name: Зафиксировать версию containerd
   ansible.builtin.dpkg_selections: { name: containerd, selection: hold }
 - name: Каталог конфигурации

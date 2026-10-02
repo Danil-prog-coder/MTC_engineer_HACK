@@ -9,9 +9,18 @@
   retries: 5
   delay: 20
   until: kubeadm_images is succeeded
-- name: kubeadm init
-  ansible.builtin.command: kubeadm init --config /etc/kubernetes/kubeadm-config.yaml
-  args: { creates: /etc/kubernetes/admin.conf }
+- name: kubeadm init с откатом при неудаче
+  block:
+    - name: kubeadm init
+      ansible.builtin.command: kubeadm init --config /etc/kubernetes/kubeadm-config.yaml
+      args: { creates: /etc/kubernetes/admin.conf }
+  rescue:
+    # admin.conf появляется до конца init: без отката повторный запуск счёл бы кластер готовым
+    - name: Откатить неудачную инициализацию (kubeadm reset)
+      ansible.builtin.command: kubeadm reset -f
+    - name: Остановить деплой
+      ansible.builtin.fail:
+        msg: kubeadm init не завершился, состояние сброшено. Повторите make deploy
 - name: Определить пользователей для kubeconfig (root + пользователь, запустивший make; см. Makefile)
   ansible.builtin.set_fact:
     kube_users:

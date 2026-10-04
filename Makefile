@@ -17,6 +17,22 @@ NODE_IP       := $(strip $(NODE_IP))
 METALLB_RANGE := $(strip $(METALLB_RANGE))
 INVENTORY     := $(strip $(INVENTORY))
 
+# Автовыбор источников загрузки. MIRRORS=auto (по умолчанию): если pypi.org, files.pythonhosted.org, Docker Hub, quay.io или CDN Kubernetes
+# недоступны с этого хоста, подключается профиль зеркал mirrors-ru.env. MIRRORS=on - принудительно профиль, off - только upstream.
+# Если зеркала заданы вручную (.env или окружение), автовыбор не вмешивается. Проверка идёт только для целей, которым нужна сеть.
+MIRRORS := $(strip $(or $(MIRRORS),auto))
+ifneq ($(filter bootstrap deploy idempotency-check verify lint test,$(MAKECMDGOALS)),)
+ifneq ($(MIRRORS),off)
+ifeq ($(strip $(PIP_INDEX_URL)$(K8S_APT_REPO)$(DOCKERHUB_MIRRORS)$(QUAY_MIRRORS)$(K8S_REGISTRY_MIRRORS)$(OCI_DOCKERHUB_MIRROR)$(CALICO_REGISTRY)$(GHCR_MIRROR)),)
+MIRRORS_MODE := $(if $(filter on,$(MIRRORS)),ru,$(strip $(shell bash scripts/detect-mirrors.sh)))
+ifeq ($(MIRRORS_MODE),ru)
+$(info [mirrors] upstream недоступен или MIRRORS=on: подключён профиль зеркал mirrors-ru.env)
+include mirrors-ru.env
+endif
+endif
+endif
+endif
+
 # Пользователь, запустивший make (для kubeconfig): при `sudo make` это SUDO_USER.
 HACK_USER := $(or $(SUDO_USER),$(shell id -un))
 HACK_HOME := $(shell getent passwd $(HACK_USER) | cut -d: -f6)

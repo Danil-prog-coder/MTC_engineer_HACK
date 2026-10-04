@@ -1,10 +1,17 @@
 ---
+- name: Чарт victoria-logs-single (в локальный кэш)
+  ansible.builtin.include_tasks: "{{ playbook_dir }}/tasks/fetch_chart.yml"
+  vars:
+    chart_url: "https://github.com/VictoriaMetrics/helm-charts/releases/download/victoria-logs-single-{{ versions.victoria_logs.version }}/victoria-logs-single-{{ versions.victoria_logs.version }}.tgz"
+    chart_file: "victoria-logs-single-{{ versions.victoria_logs.version }}.tgz"
+    chart_oci: oci://ghcr.io/victoriametrics/helm-charts/victoria-logs-single
+    chart_version: "{{ versions.victoria_logs.version }}"
 - name: VictoriaLogs
   kubernetes.core.helm:
     kubeconfig: "{{ kubeconfig }}"
     name: victoria-logs
-    chart_ref: victoria-logs-single
-    chart_repo_url: "{{ versions.victoria_logs.chart_repo }}"
+    # .tgz тот же, на который ссылается index.yaml репозитория VictoriaMetrics (GitHub Releases)
+    chart_ref: "/var/cache/hackops/charts/victoria-logs-single-{{ versions.victoria_logs.version }}.tgz"
     chart_version: "{{ versions.victoria_logs.version }}"
     release_namespace: logging
     wait: true

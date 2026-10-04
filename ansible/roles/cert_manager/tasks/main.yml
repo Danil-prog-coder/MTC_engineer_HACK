@@ -1,10 +1,14 @@
 ---
+- name: Чарт cert-manager (в локальный кэш)
+  ansible.builtin.include_tasks: "{{ playbook_dir }}/tasks/fetch_chart.yml"
+  vars:
+    chart_url: "{{ versions.cert_manager.chart_repo }}/charts/cert-manager-{{ versions.cert_manager.version }}.tgz"
+    chart_file: "cert-manager-{{ versions.cert_manager.version }}.tgz"
 - name: cert-manager
   kubernetes.core.helm:
     kubeconfig: "{{ kubeconfig }}"
     name: cert-manager
-    chart_ref: cert-manager
-    chart_repo_url: "{{ versions.cert_manager.chart_repo }}"
+    chart_ref: "/var/cache/hackops/charts/cert-manager-{{ versions.cert_manager.version }}.tgz"
     chart_version: "{{ versions.cert_manager.version }}"
     release_namespace: cert-manager
     wait: true

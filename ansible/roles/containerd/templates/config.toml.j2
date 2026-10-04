@@ -1,4 +1,5 @@
-# Управляется Ansible. Ubuntu 24.04 -> containerd 1.7.x (config version 2).
+# Управляется Ansible. Формат config version 2: его читают containerd 1.7.x и 2.x
+# (в Ubuntu 24.04 noble-updates сейчас containerd 2.2 — он мигрирует v2 на лету).
 version = 2
 [plugins."io.containerd.grpc.v1.cri"]
   sandbox_image = "registry.k8s.io/pause:3.10.2"
@@ -6,3 +7,7 @@ version = 2
     runtime_type = "io.containerd.runc.v2"
     [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options]
       SystemdCgroup = true
+  # Зеркала реестров (registry mirrors). Устаревшая секция registry.mirrors удалена в containerd 2.x,
+  # поэтому зеркала описаны в hosts.toml (по каталогу на реестр, см. group_vars: mirrors.registries).
+  [plugins."io.containerd.grpc.v1.cri".registry]
+    config_path = "/etc/containerd/certs.d"

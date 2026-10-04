@@ -3,7 +3,7 @@
 # Рендерим чарт и применяем server-side: changed корректен, релиза Helm нет.
 - name: Рендер CRD Gateway API (Standard) и Envoy Gateway
   kubernetes.core.helm_template:
-    chart_ref: "{{ versions.envoy_gateway.crds_chart }}"
+    chart_ref: "{{ envoy_gateway_crds_chart }}"  # docker.io -> mirrors.oci_dockerhub
     chart_version: "{{ versions.envoy_gateway.version }}"
     release_name: eg-crds
     release_namespace: gateway-system
@@ -28,7 +28,7 @@
   kubernetes.core.helm:
     kubeconfig: "{{ kubeconfig }}"
     name: eg
-    chart_ref: "{{ versions.envoy_gateway.chart }}"
+    chart_ref: "{{ envoy_gateway_chart }}"  # docker.io -> mirrors.oci_dockerhub
     chart_version: "{{ versions.envoy_gateway.version }}"
     release_namespace: gateway-system
     wait: true
@@ -39,6 +39,17 @@
   retries: 5
   delay: 20
   until: helm_envoy_gateway_envoy is succeeded
+# После первого создания CRD/ValidatingAdmissionPolicy повторный SSA один раз меняет managedFields
+# (запись статус-контроллера VAP), из-за чего второй make deploy показывал changed. Повторяем apply
+# в первом прогоне — после установки контроллера — чтобы следующий прогон был changed=0.
+- name: CRD — стабилизация после первого применения
+  kubernetes.core.k8s:
+    kubeconfig: "{{ kubeconfig }}"
+    apply: true
+    server_side_apply: { field_manager: hackops, force_conflicts: true }
+    definition: "{{ eg_crds.stdout | from_yaml_all | select | list }}"
+  when: eg_crds_apply is changed
+  changed_when: false
 - name: Gateway (EnvoyProxy, GatewayClass, Gateway, Certificate)
   kubernetes.core.k8s:
     kubeconfig: "{{ kubeconfig }}"

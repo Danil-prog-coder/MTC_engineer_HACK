@@ -1,7 +1,7 @@
 ---
 - name: Ключ репозитория Kubernetes
   ansible.builtin.shell: |
-    curl -fsSL https://pkgs.k8s.io/core:/stable:/v{{ versions.kubernetes.minor }}/deb/Release.key | gpg --dearmor -o /etc/apt/keyrings/kubernetes-{{ versions.kubernetes.minor }}.gpg
+    curl -fsSL {{ mirrors.k8s_apt }}Release.key | gpg --dearmor -o /etc/apt/keyrings/kubernetes-{{ versions.kubernetes.minor }}.gpg
   args: { creates: "/etc/apt/keyrings/kubernetes-{{ versions.kubernetes.minor }}.gpg" }
   register: k8s_key
   retries: 5
@@ -9,7 +9,7 @@
   until: k8s_key is succeeded
 - name: Репозиторий Kubernetes
   ansible.builtin.apt_repository:
-    repo: "deb [signed-by=/etc/apt/keyrings/kubernetes-{{ versions.kubernetes.minor }}.gpg] https://pkgs.k8s.io/core:/stable:/v{{ versions.kubernetes.minor }}/deb/ /"
+    repo: "deb [signed-by=/etc/apt/keyrings/kubernetes-{{ versions.kubernetes.minor }}.gpg] {{ mirrors.k8s_apt }} /"
     filename: kubernetes
     state: present
   register: k8s_repo

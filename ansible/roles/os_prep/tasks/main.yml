@@ -32,30 +32,3 @@
   retries: 5
   delay: 15
   until: base_pkgs is succeeded
-- name: Версия установленного Helm
-  ansible.builtin.command: /usr/local/bin/helm version --short
-  register: helm_installed
-  changed_when: false
-  failed_when: false
-- name: Helm (официальный бинарник get.helm.sh, версия из versions.yaml, проверка sha256)
-  when: helm_installed.rc != 0 or not helm_installed.stdout.startswith(versions.helm.version)
-  block:
-    - name: Скачать архив Helm
-      ansible.builtin.get_url:
-        url: "https://get.helm.sh/helm-{{ versions.helm.version }}-linux-amd64.tar.gz"
-        checksum: "sha256:https://get.helm.sh/helm-{{ versions.helm.version }}-linux-amd64.tar.gz.sha256sum"
-        dest: "/tmp/helm-{{ versions.helm.version }}.tar.gz"
-        mode: "0644"
-        timeout: 60
-      register: helm_download
-      retries: 5
-      delay: 15
-      until: helm_download is succeeded
-    - name: Установить helm в /usr/local/bin
-      ansible.builtin.unarchive:
-        src: "/tmp/helm-{{ versions.helm.version }}.tar.gz"
-        dest: /usr/local/bin
-        remote_src: true
-        include: [linux-amd64/helm]
-        extra_opts: [--strip-components=1]
-        mode: "0755"

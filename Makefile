@@ -30,6 +30,17 @@ HACKOPS := $(BIN)/hackops
 PLAY    := ANSIBLE_CONFIG=ansible/ansible.cfg $(BIN)/ansible-playbook -i $(INVENTORY) ansible/site.yml
 SECRETS := /etc/hackops/secrets
 
+# Источники загрузки: по умолчанию upstream. Для сетей с блокировками — зеркала в .env (пример: mirrors-ru.env).
+PIP_INDEX_URL       ?= https://pypi.org/simple/
+# Короткий таймаут + докачка: на нестабильных каналах соединение «замирает», pip продолжает файл с места обрыва
+PIP_DEFAULT_TIMEOUT ?= 20
+PIP_RETRIES         ?= 10
+PIP_RESUME_RETRIES  ?= 10
+MIRROR_VARS := PIP_INDEX_URL K8S_APT_REPO DOCKERHUB_MIRRORS QUAY_MIRRORS K8S_REGISTRY_MIRRORS \
+               OCI_DOCKERHUB_MIRROR CALICO_REGISTRY GHCR_MIRROR
+$(foreach v,$(MIRROR_VARS),$(eval $(v) := $(strip $($(v)))))
+export PIP_DEFAULT_TIMEOUT PIP_RETRIES PIP_RESUME_RETRIES $(MIRROR_VARS)
+
 .PHONY: help bootstrap deploy verify idempotency-check creds ca logs-find logs-query lint test destroy
 
 help: ## Список команд
@@ -43,7 +54,10 @@ $(VENV)/.bootstrapped: requirements.txt requirements-dev.txt ansible/requirement
 	python3 -m venv $(VENV)
 	$(BIN)/pip install -q --upgrade pip
 	$(BIN)/pip install -q -r requirements.txt -r requirements-dev.txt -e "tools/hackops[dev]"
-	$(BIN)/ansible-galaxy collection install -r ansible/requirements.yml
+	# galaxy.ansible.com отдаёт архивы из S3, который бывает недоступен: fallback — пакет ansible с PyPI-зеркала
+	# (входят нужные коллекции: kubernetes.core 5.4.1, community.general 10.7.6, ansible.posix 1.6.2; ansible-core 2.18)
+	timeout 120 $(BIN)/ansible-galaxy collection install --timeout 30 -r ansible/requirements.yml || \
+	  $(BIN)/pip install -q "ansible==11.13.0"
 	@touch $@
 
 bootstrap: $(VENV)/.bootstrapped ## Окружение (.venv: ansible, hackops)

@@ -1,8 +1,9 @@
 # С чего начинать следующей сессии
 
 Состояние: каркас уровня 1 + Makefile, README (13 обязательных пунктов), docs/architecture.md, чек-лист прогона.
-**На реальной ВМ ничего не запускалось** — локально проверены только: `ansible-playbook --syntax-check`
-(ansible-core 2.18.19), yamllint, ruff, mypy, pytest (9 тестов hackops), `hackops --help`, `make help`.
+На реальной ВМ (Ubuntu 24.04, РФ, с профилем зеркал `mirrors-ru.env`) пройден полный цикл deploy/verify/idempotency:
+17/17 PASS, `changed=0`. **Единственное, что не проверено, — `make deploy` без зеркал (upstream)**: нужна ВМ с нормальным
+интернетом, без `.env`. Это следующий шаг.
 
 ## Сделано в последней сессии
 - Makefile: bootstrap (.venv, python3-venv), deploy, verify, idempotency-check, creds, ca, logs-find, logs-query,

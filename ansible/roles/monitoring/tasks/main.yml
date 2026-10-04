@@ -1,10 +1,17 @@
 ---
+- name: Чарт kube-prometheus-stack (в локальный кэш)
+  ansible.builtin.include_tasks: "{{ playbook_dir }}/tasks/fetch_chart.yml"
+  vars:
+    chart_url: "https://github.com/prometheus-community/helm-charts/releases/download/kube-prometheus-stack-{{ versions.kube_prometheus_stack.version }}/kube-prometheus-stack-{{ versions.kube_prometheus_stack.version }}.tgz"
+    chart_file: "kube-prometheus-stack-{{ versions.kube_prometheus_stack.version }}.tgz"
+    chart_oci: oci://ghcr.io/prometheus-community/charts/kube-prometheus-stack
+    chart_version: "{{ versions.kube_prometheus_stack.version }}"
 - name: kube-prometheus-stack
   kubernetes.core.helm:
     kubeconfig: "{{ kubeconfig }}"
     name: kps
-    chart_ref: kube-prometheus-stack
-    chart_repo_url: "{{ versions.kube_prometheus_stack.chart_repo }}"
+    # .tgz тот же, на который ссылается index.yaml репозитория prometheus-community (GitHub Releases)
+    chart_ref: "/var/cache/hackops/charts/kube-prometheus-stack-{{ versions.kube_prometheus_stack.version }}.tgz"
     chart_version: "{{ versions.kube_prometheus_stack.version }}"
     release_namespace: monitoring
     wait: true

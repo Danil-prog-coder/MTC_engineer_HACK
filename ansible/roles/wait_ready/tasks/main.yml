@@ -6,6 +6,10 @@
     - { ns: hello, res: deploy/hello-v2 }
     - { ns: logging, res: ds/fluentd }
   changed_when: false
+  register: rollout
+  until: rollout.rc == 0
+  retries: 2
+  delay: 5
 - name: Gateway Programmed
   ansible.builtin.command: kubectl --kubeconfig {{ kubeconfig }} -n gateway-system wait --for=condition=Programmed gateway/public-gw --timeout=300s
   changed_when: false

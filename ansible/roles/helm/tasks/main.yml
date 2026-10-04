@@ -1,0 +1,52 @@
+---
+# Перенесено из os_prep: fallback через образ требует containerd с зеркалами (роль containerd).
+- name: Версия установленного Helm
+  ansible.builtin.command: /usr/local/bin/helm version --short
+  register: helm_installed
+  changed_when: false
+  failed_when: false
+- name: Helm (официальный бинарник get.helm.sh, версия из versions.yaml, проверка sha256)
+  when: helm_installed.rc != 0 or not helm_installed.stdout.startswith(versions.helm.version)
+  block:
+    - name: Скачать архив Helm
+      ansible.builtin.get_url:
+        url: "https://get.helm.sh/helm-{{ versions.helm.version }}-linux-amd64.tar.gz"
+        checksum: "sha256:https://get.helm.sh/helm-{{ versions.helm.version }}-linux-amd64.tar.gz.sha256sum"
+        dest: "/tmp/helm-{{ versions.helm.version }}.tar.gz"
+        mode: "0644"
+        timeout: 20
+      register: helm_download
+      retries: 1
+      delay: 5
+      until: helm_download is succeeded
+    - name: Установить helm в /usr/local/bin
+      ansible.builtin.unarchive:
+        src: "/tmp/helm-{{ versions.helm.version }}.tar.gz"
+        dest: /usr/local/bin
+        remote_src: true
+        include: [linux-amd64/helm]
+        extra_opts: [--strip-components=1]
+        mode: "0755"
+  rescue:
+    # get.helm.sh недоступен: берём бинарник той же версии из образа через зеркала containerd
+    - name: Helm из образа {{ mirrors.helm_image }} (fallback)
+      ansible.builtin.shell: |
+        set -euo pipefail
+        work=$(mktemp -d); trap 'rm -rf "$work"' EXIT
+        ctr -n hackops-tools images pull --hosts-dir /etc/containerd/certs.d --platform linux/amd64 {{ mirrors.helm_image }} >/dev/null
+        # ctr images mount в containerd 2.x не работает без снапшота — достаём файл из слоя образа
+        ctr -n hackops-tools images export --platform linux/amd64 "$work/img.tar" {{ mirrors.helm_image }}
+        mkdir "$work/oci" && tar -xf "$work/img.tar" -C "$work/oci"
+        # слой с usr/bin/helm; остальные blob-ы (манифесты, другие слои) tar пропускает с ошибкой
+        for b in "$work"/oci/blobs/sha256/*; do tar -xzf "$b" -C "$work" usr/bin/helm 2>/dev/null || true; done
+        install -m 0755 "$work/usr/bin/helm" /usr/local/bin/helm
+      args: { executable: /bin/bash }
+      register: helm_fallback
+      retries: 3
+      delay: 15
+      until: helm_fallback is succeeded
+- name: Проверить версию helm
+  ansible.builtin.command: /usr/local/bin/helm version --short
+  register: helm_check
+  changed_when: false
+  failed_when: not helm_check.stdout.startswith(versions.helm.version)

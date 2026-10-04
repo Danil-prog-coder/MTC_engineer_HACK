@@ -9,6 +9,14 @@
   ansible.builtin.dpkg_selections: { name: containerd, selection: hold }
 - name: Каталог конфигурации
   ansible.builtin.file: { path: /etc/containerd, state: directory, mode: "0755" }
+- name: Каталоги hosts.toml для зеркал реестров
+  ansible.builtin.file: { path: "/etc/containerd/certs.d/{{ item.key }}", state: directory, mode: "0755" }
+  loop: "{{ mirrors.registries | dict2items }}"
+  loop_control: { label: "{{ item.key }}" }
+- name: hosts.toml (зеркала реестров; применяются без перезапуска containerd)
+  ansible.builtin.template: { src: hosts.toml.j2, dest: "/etc/containerd/certs.d/{{ item.key }}/hosts.toml", mode: "0644" }
+  loop: "{{ mirrors.registries | dict2items }}"
+  loop_control: { label: "{{ item.key }}" }
 - name: config.toml
   ansible.builtin.template: { src: config.toml.j2, dest: /etc/containerd/config.toml, mode: "0644" }
   notify: restart containerd

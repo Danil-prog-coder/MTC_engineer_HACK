@@ -8,3 +8,30 @@ secrets_dir: /etc/hackops/secrets
 # на стороне контроллера без root, поэтому /etc/kubernetes/admin.conf (0600 root) не подходит.
 kubeconfig: "{{ lookup('env', 'HACK_HOME') | default('/root', true) }}/.kube/config"
 k8s_kubeconfig: "{{ kubeconfig }}"
+# Источники загрузки. По умолчанию — upstream (pkgs.k8s.io, docker.io, quay.io, registry.k8s.io).
+# Для сетей с блокировками зеркала задаются переменными окружения / .env (пример: mirrors-ru.env).
+# Версии компонентов от этого не меняются — меняется только источник загрузки.
+mirrors:
+  # APT-репозиторий Kubernetes (зеркало должно повторять структуру pkgs.k8s.io и ключ подписи)
+  k8s_apt: "{{ lookup('env', 'K8S_APT_REPO') | default('https://pkgs.k8s.io/core:/stable:/v' + versions.kubernetes.minor + '/deb/', true) }}"
+  # Зеркала реестров для containerd (hosts.toml, через запятую). Upstream всегда остаётся последним fallback-ом.
+  registries:
+    docker.io:
+      upstream: https://registry-1.docker.io
+      mirrors: "{{ lookup('env', 'DOCKERHUB_MIRRORS').split(',') | map('trim') | select | list }}"
+    quay.io:
+      upstream: https://quay.io
+      mirrors: "{{ lookup('env', 'QUAY_MIRRORS').split(',') | map('trim') | select | list }}"
+    registry.k8s.io:
+      upstream: https://registry.k8s.io
+      mirrors: "{{ lookup('env', 'K8S_REGISTRY_MIRRORS').split(',') | map('trim') | select | list }}"
+  # Реестр образов Calico для tigera-operator (Installation.spec.registry); пусто — по умолчанию оператора (quay.io)
+  calico_registry: "{{ lookup('env', 'CALICO_REGISTRY') }}"
+  # Хост для OCI-чартов из ghcr.io (запасной источник чартов kube-prometheus-stack и VictoriaLogs)
+  ghcr: "{{ lookup('env', 'GHCR_MIRROR') | default('ghcr.io', true) }}"
+  # Хост для OCI-чартов, опубликованных в docker.io (Envoy Gateway)
+  oci_dockerhub: "{{ lookup('env', 'OCI_DOCKERHUB_MIRROR') | default('docker.io', true) }}"
+  # Образ с бинарником helm той же версии — fallback, если get.helm.sh недоступен
+  helm_image: "docker.io/alpine/helm:{{ versions.helm.version | regex_replace('^v', '') }}"
+envoy_gateway_chart: "{{ versions.envoy_gateway.chart | replace('oci://docker.io/', 'oci://' + mirrors.oci_dockerhub + '/') }}"
+envoy_gateway_crds_chart: "{{ versions.envoy_gateway.crds_chart | replace('oci://docker.io/', 'oci://' + mirrors.oci_dockerhub + '/') }}"

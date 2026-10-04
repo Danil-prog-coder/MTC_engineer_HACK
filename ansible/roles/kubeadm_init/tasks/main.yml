@@ -1,4 +1,8 @@
 ---
+# Каталог создаёт пакет kubelet, но make destroy удаляет его, оставляя пакеты: без этой задачи
+# повторный make deploy после destroy падал на шаблоне ниже.
+- name: Каталог /etc/kubernetes
+  ansible.builtin.file: { path: /etc/kubernetes, state: directory, mode: "0755" }
 - name: Конфигурация kubeadm
   ansible.builtin.template: { src: kubeadm-config.yaml.j2, dest: /etc/kubernetes/kubeadm-config.yaml, mode: "0600" }
   vars: { advertise_ip: "{{ node_ip }}" }

@@ -1,8 +1,24 @@
 ---
+- name: Каталог кэша манифестов
+  ansible.builtin.file: { path: /var/cache/hackops, state: directory, mode: "0755" }
+- name: Манифест уже в кэше?
+  ansible.builtin.stat: { path: "/var/cache/hackops/tigera-operator-{{ versions.calico.version }}.yaml" }
+  register: tigera_manifest_cached
+- name: Скачать манифест tigera-operator (raw.githubusercontent.com отвечает нестабильно — повторы и кэш на диске)
+  ansible.builtin.get_url:
+    url: "https://raw.githubusercontent.com/projectcalico/calico/{{ versions.calico.version }}/manifests/tigera-operator.yaml"
+    dest: "/var/cache/hackops/tigera-operator-{{ versions.calico.version }}.yaml"
+    mode: "0644"
+    timeout: 20
+  register: tigera_manifest
+  retries: 10
+  delay: 5
+  until: tigera_manifest is succeeded
+  when: not tigera_manifest_cached.stat.exists
 - name: Tigera operator
   kubernetes.core.k8s:
     kubeconfig: "{{ kubeconfig }}"
-    definition: "{{ lookup('url', 'https://raw.githubusercontent.com/projectcalico/calico/' + versions.calico.version + '/manifests/tigera-operator.yaml', split_lines=False) | from_yaml_all | list }}"
+    definition: "{{ lookup('file', '/var/cache/hackops/tigera-operator-' + versions.calico.version + '.yaml') | from_yaml_all | list }}"
     apply: true
     server_side_apply: { field_manager: hackops, force_conflicts: true }
   register: tigera_apply
@@ -18,20 +34,22 @@
       apiVersion: operator.tigera.io/v1
       kind: Installation
       metadata: { name: default }
-      spec:
-        calicoNetwork:
-          ipPools:
-            # поля по умолчанию заданы явно: ipPools — атомарный список, иначе оператор достраивает их при каждом прогоне
-            - name: default-ipv4-ippool
-              cidr: "{{ versions.kubernetes.pod_cidr }}"
-              encapsulation: VXLAN
-              natOutgoing: Enabled
-              nodeSelector: all()
-              blockSize: 26
-              allowedUses: [Workload, Tunnel]
-              assignmentMode: Automatic
-              disableBGPExport: false
-              disableNewAllocations: false
+      # registry: источник образов Calico (по умолчанию оператор берёт quay.io; CALICO_REGISTRY=docker.io/ — Docker Hub)
+      spec: "{{ {'calicoNetwork': calico_network} | combine({'registry': mirrors.calico_registry} if mirrors.calico_registry else {}) }}"
+  vars:
+    calico_network:
+      ipPools:
+        # поля по умолчанию заданы явно: ipPools — атомарный список, иначе оператор достраивает их при каждом прогоне
+        - name: default-ipv4-ippool
+          cidr: "{{ versions.kubernetes.pod_cidr }}"
+          encapsulation: VXLAN
+          natOutgoing: Enabled
+          nodeSelector: all()
+          blockSize: 26
+          allowedUses: [Workload, Tunnel]
+          assignmentMode: Automatic
+          disableBGPExport: false
+          disableNewAllocations: false
   register: calico_inst
   retries: 12
   delay: 10
@@ -39,3 +57,8 @@
 - name: Ждать узел Ready
   ansible.builtin.command: kubectl --kubeconfig {{ kubeconfig }} wait --for=condition=Ready node --all --timeout=600s
   changed_when: false
+  register: node_ready
+  # медленный канал: образы Calico (~300 МБ) могут тянуться дольше 10 минут
+  until: node_ready.rc == 0
+  retries: 2
+  delay: 5

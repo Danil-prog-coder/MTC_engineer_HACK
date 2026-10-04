@@ -1,8 +1,22 @@
 ---
+- name: Манифест уже в кэше?
+  ansible.builtin.stat: { path: "/var/cache/hackops/local-path-storage-{{ versions.local_path_provisioner.version }}.yaml" }
+  register: lpp_manifest_cached
+- name: Скачать манифест local-path-provisioner (raw.githubusercontent.com отвечает нестабильно — повторы и кэш на диске)
+  ansible.builtin.get_url:
+    url: "https://raw.githubusercontent.com/rancher/local-path-provisioner/{{ versions.local_path_provisioner.version }}/deploy/local-path-storage.yaml"
+    dest: "/var/cache/hackops/local-path-storage-{{ versions.local_path_provisioner.version }}.yaml"
+    mode: "0644"
+    timeout: 20
+  register: lpp_manifest
+  retries: 10
+  delay: 5
+  until: lpp_manifest is succeeded
+  when: not lpp_manifest_cached.stat.exists
 - name: local-path-provisioner
   kubernetes.core.k8s:
     kubeconfig: "{{ kubeconfig }}"
-    definition: "{{ lookup('url', 'https://raw.githubusercontent.com/rancher/local-path-provisioner/' + versions.local_path_provisioner.version + '/deploy/local-path-storage.yaml', split_lines=False) | from_yaml_all | list }}"
+    definition: "{{ lookup('file', '/var/cache/hackops/local-path-storage-' + versions.local_path_provisioner.version + '.yaml') | from_yaml_all | list }}"
     apply: true
     server_side_apply: { field_manager: hackops, force_conflicts: true }
   register: lpp_apply
@@ -22,3 +36,14 @@
       provisioner: rancher.io/local-path
       volumeBindingMode: WaitForFirstConsumer
       reclaimPolicy: Delete
+# Объекты манифеста без полей кроме имени (Namespace, ServiceAccount) после первого SSA остаются без
+# managedFields; следующий apply дописывает запись before-first-apply, и модуль k8s видит изменение.
+# Повторный apply сразу после создания доводит состояние до стабильного: второй make deploy даёт changed=0.
+- name: local-path-provisioner — стабилизация после первого применения
+  kubernetes.core.k8s:
+    kubeconfig: "{{ kubeconfig }}"
+    definition: "{{ lookup('file', '/var/cache/hackops/local-path-storage-' + versions.local_path_provisioner.version + '.yaml') | from_yaml_all | list }}"
+    apply: true
+    server_side_apply: { field_manager: hackops, force_conflicts: true }
+  when: lpp_apply is changed
+  changed_when: false

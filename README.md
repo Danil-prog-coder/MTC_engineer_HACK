@@ -162,6 +162,13 @@ make verify      # отчёт-доказательство
 Ничего редактировать не нужно. Необязательные параметры (файл `.env`, пример — `.env.example`, либо переменные
 окружения): `NODE_IP` (по умолчанию определяется автоматически), `DOMAIN` (`hack.local`), `INVENTORY`.
 
+**Сеть с блокировками.** По умолчанию всё качается из upstream. Если с ВМ недоступны pypi.org, Docker Hub,
+quay.io, CDN pkgs.k8s.io / registry.k8s.io (типично для VPS в РФ), подключите профиль зеркал: `cp mirrors-ru.env .env`
+(переменные: `PIP_INDEX_URL`, `K8S_APT_REPO`, `DOCKERHUB_MIRRORS`, `QUAY_MIRRORS`, `K8S_REGISTRY_MIRRORS`,
+`OCI_DOCKERHUB_MIRROR`, `CALICO_REGISTRY`, `GHCR_MIRROR`). Версии компонентов при этом не меняются. Зеркала реестров containerd настраиваются через
+`/etc/containerd/certs.d/<registry>/hosts.toml`; upstream остаётся fallback-ом. Если get.helm.sh или galaxy.ansible.com
+недоступны, срабатывают встроенные fallback-и: helm берётся из образа той же версии, коллекции — из пакета `ansible` с PyPI.
+
 ## 8. Команда запуска и что она делает
 
 Одна команда: **`make deploy`**. Порядок (Ansible-роли в [`ansible/site.yml`](ansible/site.yml)):

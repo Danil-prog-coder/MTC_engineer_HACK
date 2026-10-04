@@ -11,9 +11,9 @@
       - ansible_processor_vcpus | int >= 2
       - ansible_memtotal_mb | int >= 3500
     fail_msg: "Минимум: 2 vCPU и 4 ГБ RAM (рекомендовано 4 vCPU / 8 ГБ / 40 ГБ диска)"
-- name: Проверка интернета (pkgs.k8s.io)
+- name: Проверка интернета (APT-репозиторий Kubernetes)
   ansible.builtin.uri:
-    url: https://pkgs.k8s.io/core:/stable:/v{{ versions.kubernetes.minor }}/deb/Release
+    url: "{{ mirrors.k8s_apt }}Release"
     method: HEAD
     timeout: 20
   retries: 3

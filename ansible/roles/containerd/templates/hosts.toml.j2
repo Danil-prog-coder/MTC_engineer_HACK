@@ -1,0 +1,7 @@
+# Управляется Ansible: зеркала для {{ item.key }}; upstream ({{ item.value.upstream }}) — последний fallback.
+server = "{{ item.value.upstream }}"
+{% for m in item.value.mirrors %}
+
+[host."{{ m }}"]
+  capabilities = ["pull", "resolve"]
+{% endfor %}

@@ -1,0 +1,37 @@
+---
+# Скачать .tgz Helm-чарта в локальный кэш с повторами: helm при загрузке из репозитория не имеет
+# таймаута и «висит» на оборванном соединении; локальный файл ставится без сети и при повторных прогонах.
+# Вход: chart_url, chart_file; необязательно chart_oci + chart_version — запасной источник (OCI-реестр,
+# хост переопределяется mirrors.ghcr), если по chart_url скачать не удалось.
+- name: Каталог кэша чартов
+  ansible.builtin.file: { path: /var/cache/hackops/charts, state: directory, mode: "0755" }
+- name: Чарт {{ chart_file }} уже в кэше?
+  ansible.builtin.stat: { path: "/var/cache/hackops/charts/{{ chart_file }}" }
+  register: chart_cached
+- name: Загрузка чарта {{ chart_file }}
+  when: not chart_cached.stat.exists
+  block:
+    - name: Скачать чарт {{ chart_file }}
+      ansible.builtin.get_url:
+        url: "{{ chart_url }}"
+        dest: "/var/cache/hackops/charts/{{ chart_file }}"
+        mode: "0644"
+        timeout: 30
+      register: chart_download
+      retries: 6
+      delay: 10
+      until: chart_download is succeeded
+  rescue:
+    - name: Чарт {{ chart_file }} из OCI-реестра (запасной источник)
+      ansible.builtin.command: >-
+        timeout 180 /usr/local/bin/helm pull {{ chart_oci | replace('oci://ghcr.io/', 'oci://' + mirrors.ghcr + '/') }}
+        --version {{ chart_version }} -d /var/cache/hackops/charts
+      args: { creates: "/var/cache/hackops/charts/{{ chart_file }}" }
+      register: chart_pull
+      retries: 10
+      delay: 15
+      until: chart_pull is succeeded
+      when: chart_oci is defined
+    - name: Чарт {{ chart_file }} не удалось скачать
+      ansible.builtin.fail: { msg: "Не удалось скачать {{ chart_url }} (и запасной OCI-источник не задан)" }
+      when: chart_oci is not defined

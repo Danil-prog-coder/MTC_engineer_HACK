@@ -5,6 +5,8 @@
 Gateway API (Envoy Gateway), мониторинг (Prometheus) и сбор логов (Fluentd → VictoriaLogs), а `make verify`
 сама доказывает, что всё работает.
 
+Что это за проект, зачем он и как мы его делали — коротко в [docs/PROJECT.md](docs/PROJECT.md).
+
 ## Быстрый старт
 
 ```bash
@@ -353,5 +355,5 @@ k8s/overlays/kubeadm/    сборка приложения для стенда
 tools/hackops/           Python-тулинг: verify, logs-find, logs-query, idempotency (+ unit-тесты)
 scripts/                 gen_hello.py (hello-v1/v2 из одного шаблона), gen_dashboards.py, destroy.sh
 .github/workflows/       CI (ci.yml)
-docs/                    architecture.md, VERIFY_ON_VM.md
+docs/                    PROJECT.md (о проекте), architecture.md, VERIFY_ON_VM.md
 ```
